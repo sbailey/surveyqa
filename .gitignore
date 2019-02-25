@@ -9,7 +9,8 @@ htmlcov
 doc/api
 doc/_build
 
-# iPython
+# IPython / jupyter
+.ipynb_checkpoints
 examples/.ipynb_checkpoints
 
 # Packages/installer info
