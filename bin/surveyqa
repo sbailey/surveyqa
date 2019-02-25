@@ -26,7 +26,7 @@ tiles = tiles[tiles['IN_DESI']>0]
 
 #- Create output directory if needed
 if args.outdir is None:
-    args.outdir = os.path.join(os.getcwd(), 'surveyqa')
+    args.outdir = os.path.join(os.getcwd(), 'survey-qa')
 
 if not os.path.isdir(args.outdir):
     os.makedirs(args.outdir, exist_ok=True)

@@ -11,28 +11,34 @@ from bokeh.embed import components
 import bokeh
 import bokeh.plotting as bk
 
-def get_plot1(exposures, tiles, width=300, height=200):
+def get_timeseries(exposures, tiles, name):
     '''
-    Placeholder for generating some plot
+    PLACEHOLDER CODE: return (times, values) for column `name`
     '''
-    fig = bk.figure(width=width, height=height)
-    x = np.sort(np.random.uniform(0, 1, size=20))
-    y = np.random.uniform(size=len(x))
-    fig.line(x, y)
-    fig.circle(x, y, color='darkred')
-    fig.yaxis.axis_label = 'blat'
-    return fig
+    #- Replace this with actual code to extract something meaningful...
+    x = np.linspace(0, 10)
+    y = np.random.normal(size=len(x))
+    return x, y
 
-def get_plot2(exposures, tiles, width=300, height=200):
+def plot_timeseries(times, values, name, x_range=None):
     '''
-    Placeholder for generating some plot
+    PLACEHOLDER CODE: plots values vs. times
+
+    Args:
+        times : array of times (TODO: what units should these be?)
+        values : array of values to plot
+        name : string name of this timeseries
+
+    Returns bokeh Figure object
     '''
-    fig = bk.figure(width=width, height=height)
-    x = np.sort(np.random.uniform(0, 1, size=20))
-    y = np.random.uniform(size=len(x))
-    fig.line(x, y)
-    fig.circle(x, y, color='darkred')
-    fig.yaxis.axis_label = 'foo'
+    fig = bk.figure(width=400, height=100, toolbar_location=None, x_range=x_range, active_scroll='wheel_zoom')
+    fig.line(times, values)
+    fig.circle(times, values, line_color='darkorange', fill_color='white', size=6, line_width=2)
+    fig.ygrid.grid_line_color = None
+    fig.xgrid.grid_line_color = None
+    fig.outline_line_color = None
+    fig.yaxis.axis_label = name
+
     return fig
 
 def makeplots(night, exposures, tiles, outdir):
@@ -47,6 +53,26 @@ def makeplots(night, exposures, tiles, outdir):
     Writes outdir/night-*.html
     '''
 
+    #- Filter exposures to just this night
+    #- Note: this replaces local variable but does not modify original input (good)
+    exposures = exposures[exposures['NIGHT'] == night]
+
+    #- Get timeseries plots for several variables
+    x, y = get_timeseries(exposures, tiles, 'AIRMASS')
+    plot1 = plot_timeseries(x, y, 'AIRMASS')
+
+    x, y = get_timeseries(exposures, tiles, 'SEEING')
+    plot2 = plot_timeseries(x, y, 'SEEING', x_range=plot1.x_range)
+
+    x, y = get_timeseries(exposures, tiles, 'EXPTIME')
+    plot3 = plot_timeseries(x, y, 'EXPTIME', x_range=plot1.x_range)
+
+    #- Convert these to the components to include in the HTML
+    timeseries_script, timeseries_div = components(bk.Column(plot1, plot2, plot3))
+
+    #----
+    #- Template HTML for this page
+    
     #- Generate HTML header separately so that we can get the right bokeh
     #- version in there without mucking up the python string formatting
     header = """
@@ -70,13 +96,9 @@ def makeplots(night, exposures, tiles, outdir):
     """.format(night)
 
     template += """
-        {{ script1 }}
+        {{ timeseries_script }}
     
-        {{ div1 }}
-
-        {{ script2 }}
-    
-        {{ div2 }}
+        {{ timeseries_div }}
 
         <p>etc.  Add more plots...</p>
     
@@ -85,26 +107,15 @@ def makeplots(night, exposures, tiles, outdir):
     </html>
     """
 
-    exposures = exposures[exposures['NIGHT'] == night]
-
-    outfile = os.path.join(outdir, 'night-{}.html'.format(night))
-
-    plot1 = get_plot1(exposures, tiles)
-    script1, div1 = components(plot1)
-
-    plot2 = get_plot2(exposures, tiles)
-    script2, div2 = components(plot2)
-
     #- Convert to a jinja2.Template object and render HTML
     html = jinja2.Template(template).render(
-        script1=script1, div1=div1,
-        script2=script2, div2=div2,
+        timeseries_script=timeseries_script, timeseries_div=timeseries_div,
         )
 
     #- Write output file for this night
+    outfile = os.path.join(outdir, 'night-{}.html'.format(night))
     with open(outfile, 'w') as fx:
         fx.write(html)
 
     print('Wrote {}'.format(outfile))
-    
     
