@@ -29,7 +29,7 @@ def get_skyplot(exposures, tiles, width=600, height=300):
     fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
 
     observed = np.in1d(tiles['TILEID'], exposures['TILEID'])
-    fig.circle(tiles['RA'][observed], tiles['DEC'][observed], color='blue', size=3)
+    fig.circle(tiles['RA'][observed], tiles['DEC'][observed], color='red', size=3)
     fig.xaxis.axis_label = 'RA [degrees]'
     fig.yaxis.axis_label = 'Declination [degrees]'
     fig.title.text = 'Placeholder: Observed Tiles'
