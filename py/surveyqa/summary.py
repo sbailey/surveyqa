@@ -9,10 +9,34 @@ import jinja2
 from bokeh.embed import components
 import bokeh
 import bokeh.plotting as bk
+from bokeh.models import ColumnDataSource, LinearColorMapper, ColorBar, HoverTool
+from bokeh.transform import transform
+
+def nights_first_observed(exposures, tiles):
+    '''
+    Generates a list of the first night on which each tile was observed (mainly for use in color coding the skyplot).
+    Uses numpy.unique, numpy.array
+    
+    Args: 
+        exposures: Table of exposures with columns ...
+        tiles: Table of tile locations with columns...
+    
+    Returns two arrays:
+        array of float values (meaning exact time of first exposure taken)
+        array of integer values (the night, not the exact time)'''
+    
+    tiles_unique, indx = np.unique(exposures['TILEID'], return_index=True)
+    nights = exposures['MJD'][indx]
+    nights = nights[1:len(nights)]
+    nights_int = np.array(nights.astype(int))
+    
+    return nights, nights_int
 
 def get_skyplot(exposures, tiles, width=600, height=300):
     '''
-    Generates sky plot of DESI survey tiles and progress
+    Generates sky plot of DESI survey tiles and progress. Colorcoded by night each tile was first
+    observed, uses nights_first_observed function defined previously in this module to retrieve
+    night each tile was first observed. 
 
     Args:
         exposures: Table of exposures with columns ...
@@ -22,17 +46,36 @@ def get_skyplot(exposures, tiles, width=600, height=300):
         width, height: plot width and height in pixels
 
     Returns bokeh Figure object
-    
-    NOTE: This is just a placeholder.  Replace it with something better.
     '''
-    fig = bk.figure(width=width, height=height)
-    fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
-
     observed = np.in1d(tiles['TILEID'], exposures['TILEID'])
-    fig.circle(tiles['RA'][observed], tiles['DEC'][observed], color='red', size=3)
+    nights, nights_int = nights_first_observed(exposures, tiles)
+    
+    source = ColumnDataSource(data=dict(
+    RA = tiles['RA'], 
+    DEC = tiles['DEC']))
+
+    source_obs = ColumnDataSource(data=dict(
+        RA_obs = tiles['RA'][observed], 
+        DEC_obs = tiles['DEC'][observed],  
+        MJD = nights_int
+    ))
+
+    color_mapper = LinearColorMapper(palette="Viridis256", low=nights_int.min(), high=nights_int.max())
+
+    ##making figure
+    fig = bk.figure(width=600, height=300)
+
+    #unobserved tiles
+    fig.circle('RA', 'DEC', source=source, color='gray', radius=0.25)
+    
+    #observed tiles
+    fig.circle('RA_obs', 'DEC_obs', color=transform('MJD', color_mapper), size=3, alpha=0.85, source=source_obs)
+    color_bar = ColorBar(color_mapper=color_mapper, label_standoff=12, location=(0,0), title='MJD')
+    fig.add_layout(color_bar, 'right')
+
     fig.xaxis.axis_label = 'RA [degrees]'
     fig.yaxis.axis_label = 'Declination [degrees]'
-    fig.title.text = 'Placeholder: Observed Tiles'
+    fig.title.text = 'Observed Tiles, Nightly Progress'
 
     return fig
 
