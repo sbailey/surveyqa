@@ -13,26 +13,29 @@ import bokeh.plotting as bk
 from bokeh.models import ColumnDataSource
 
 from astropy.time import Time
-from bokeh.models import HoverTool, ColumnDataSource
+from bokeh.models import HoverTool
 from bokeh.layouts import gridplot
 from astropy.table import join
-
+from astropy.time import TimezoneInfo
+import astropy.units as u
+from datetime import tzinfo
+from datetime import datetime
 
 def find_night(exposures, night):
     """
-    Generates a subtable of exposures corresponding to data from a single night N and adds columns DATETIME and MJD_hour
+    Generates a subtable of exposures corresponding to data from a single night N and adds column TIME
     
     ARGS:
         exposures : Table of exposures with columns
         night : A string representing a single value in the NIGHT column of the EXPOSURES table
     """
     exposures = exposures[exposures['NIGHT'] == night]
-
-    mjds = Time(np.array(exposures['MJD']), format='mjd')
-    exposures['DATETIME'] = mjds
-    mjd_ints = np.array(exposures['MJD']).astype(int)
-    mjd_hours = (np.array(exposures['MJD']) - mjd_ints) * 24
-    exposures['MJD_hour'] = mjd_hours
+    
+    mjds = np.array(exposures['MJD'])
+    tzone = TimezoneInfo(utc_offset = -7*u.hour)
+    times = [Time(mjd, format='mjd', scale='utc').to_datetime(timezone=tzone) for mjd in mjds]    
+    
+    exposures['TIME'] = times
     return exposures
 
 
@@ -40,12 +43,12 @@ def get_timeseries(exposures, tiles, name):
     '''
     Generates times and values arrays for column `name`
     '''
-    x = np.array(exposures['MJD_hour'])
+    x = np.array(exposures['TIME'])
     y = np.array(exposures[name])
     return x, y
 
 
-def plot_timeseries(times, values, name, color, x_range=None):
+def plot_timeseries(times, values, name, color, x_range=None, title=None):
     '''
     Plots VALUES vs. TIMES
 
@@ -58,7 +61,9 @@ def plot_timeseries(times, values, name, color, x_range=None):
 
     Returns bokeh Figure object
     '''
-    fig = bk.figure(width=400, height=250, toolbar_location=None, x_range=x_range, active_scroll='wheel_zoom')
+    fig = bk.figure(width=400, height=250, toolbar_location=None, 
+                    x_axis_type='datetime', x_range=x_range, 
+                    active_scroll='wheel_zoom', title=title)
     fig.line(times, values)
     fig.circle(times, values, line_color=color, fill_color='white', size=6, line_width=2)
     fig.ygrid.grid_line_color = None
@@ -67,7 +72,6 @@ def plot_timeseries(times, values, name, color, x_range=None):
     fig.yaxis.axis_label = name
 
     return fig
-
 
 def get_nightlytable(exposures):
     '''
@@ -118,16 +122,16 @@ def makeplots(night, exposures, tiles, outdir):
     #- Note: this replaces local variable but does not modify original input (good)
     exposures = find_night(exposures, night)
 
+    title='Airmass, Seeing, Exptime vs. Time for {}/{}/{}'.format(night[4:6], night[6:], night[:4])
     #- Get timeseries plots for several variables
     x, y = get_timeseries(exposures, tiles, 'AIRMASS')
-    airmass = plot_timeseries(x, y, 'AIRMASS', 'darkorange')
+    airmass = plot_timeseries(x, y, 'AIRMASS', 'darkorange', x_range=None, title=title)
 
     x, y = get_timeseries(exposures, tiles, 'SEEING')
     seeing = plot_timeseries(x, y, 'SEEING', 'navy', x_range=airmass.x_range)
 
     x, y = get_timeseries(exposures, tiles, 'EXPTIME')
     exptime = plot_timeseries(x, y, 'EXPTIME', 'green', x_range=airmass.x_range)
-
 
     #- Convert these to the components to include in the HTML
     timeseries_script, timeseries_div = components(bk.Column(airmass, seeing, exptime))
