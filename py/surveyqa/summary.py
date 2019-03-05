@@ -79,6 +79,63 @@ def get_skyplot(exposures, tiles, width=600, height=300):
 
     return fig
 
+def get_summarytable(exposures):
+    '''
+    Generates a summary table of key values for each night observed. Uses collections.Counter()
+    
+    Args:
+        exposures: Table of exposures with columns...
+        
+    Returns a bokeh DataTable object.
+    '''
+    from bokeh.models.widgets.tables import DataTable, TableColumn
+    from collections import Counter
+    
+    night = exposures['NIGHT']
+    night_exps_total = np.array(Counter(night).values())
+
+    #list of counts of each program for each night
+    dct = []
+    for n in list(Counter(exposures['NIGHT']).keys()):
+        keep = exposures['NIGHT'] == n
+        nights_selected = exposures[keep]
+        program_freq = Counter(nights_selected['PROGRAM'])
+        dct.append(program_freq)
+
+    #get the values out of the dictionaries above (in a specified order so we can splice later)
+    counts = []
+    for d in dct:
+        for key in ['BRIGHT', 'GRAY', 'DARK', 'CALIB']:
+            counts.append(d[key])
+
+    #lists of counts of each program for each night
+    brights = np.array([counts[i] for i in np.arange(0,len(counts), 4)])
+    grays = np.array([counts[i] for i in np.arange(1,len(counts), 4)])
+    darks = np.array([counts[i] for i in np.arange(2,len(counts), 4)])
+    calibs = np.array([counts[i] for i in np.arange(3,len(counts), 4)])
+
+    source = ColumnDataSource(data=dict(
+        nights = list(Counter(exposures['NIGHT']).keys()),
+        totals = list(Counter(exposures['NIGHT']).values()),
+        brights = brights,
+        grays = grays,
+        darks = darks,
+        calibs = calibs
+    ))
+
+    columns = [
+        TableColumn(field='nights', title='NIGHT'),
+        TableColumn(field='totals', title='Total Exposures'),
+        TableColumn(field='brights', title='Bright Exposures'),
+        TableColumn(field='grays', title='Gray Exposures'),
+        TableColumn(field='darks', title='Dark Exposures'),
+        TableColumn(field='calib', title='Calibrations'),
+    ]
+
+    summary_table = DataTable(source=source, columns=columns, sortable=True)
+    
+    return summary_table
+
 def get_surveyprogress(exposures, tiles, width=300, height=300):
     '''
     Generates a plot of survey progress vs. time
@@ -124,13 +181,31 @@ def makeplots(exposures, tiles, outdir):
         href="https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.css"
         rel="stylesheet" type="text/css"
     >
+    <link
+        href="https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.css"
+        rel="stylesheet" type="text/css"
+    >
     <script 
         src="https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.js"
+    ></script>
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.js"
     ></script>
     """.format(version=bokeh.__version__)
 
     #- Now add the HTML body with template placeholders for plots
     template = header + """
+    <head>
+    <style>
+    .flex-container {
+        display: flex;
+        flex-direction: row;
+        flex-flow: row wrap;    
+    }
+    </style>
+    </head>
+    """
+    
+    template += """
     <body>
 
         <h1>DESI Survey QA</h1>
@@ -138,14 +213,26 @@ def makeplots(exposures, tiles, outdir):
     """.format(max(exposures['NIGHT']))
     
     template += """
-    
-        {{ skyplot_script }}
-    
-        {{ skyplot_div }}
-
-        {{ progress_script }}
-    
-        {{ progress_div }}
+        <p>Progress: </p>
+        <div class="flex-container">
+            <div>{{ skyplot_script }} {{ skyplot_div }}</div>
+            <div>{{ progress_script }} {{ progress_div }}</div>
+            <div>{{ progress_script_1 }} {{ progress_div_1 }}</div>
+        </div>
+        
+        <p>Histograms: </p>
+        
+        <div class="flex-container">
+            <div>HISTOGRAMS GO HERE</div>
+            <div>AND HERE</div>
+            <div>AND HERE</div>
+        </div>
+        
+        <p>Summary Table: </p>
+        
+        {{ summarytable_script }}
+        
+        {{ summarytable_div }}
 
         <p>etc.  Add more plots...</p>
 
@@ -159,11 +246,19 @@ def makeplots(exposures, tiles, outdir):
 
     progressplot = get_surveyprogress(exposures, tiles)
     progress_script, progress_div = components(progressplot)
+    
+    progressplot_1 = get_surveyprogress(exposures, tiles)
+    progress_script_1, progress_div_1 = components(progressplot_1)
+    
+    summarytable = get_summarytable(exposures)
+    summarytable_script, summarytable_div = components(summarytable)
 
     #- Convert to a jinja2.Template object and render HTML
     html = jinja2.Template(template).render(
         skyplot_script=skyplot_script, skyplot_div=skyplot_div,
         progress_script=progress_script, progress_div=progress_div,
+        progress_script_1=progress_script_1, progress_div_1=progress_div_1,
+        summarytable_script=summarytable_script, summarytable_div=summarytable_div, 
         )
     
     outfile = os.path.join(outdir, 'summary.html')

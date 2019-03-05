@@ -10,6 +10,7 @@ import jinja2
 from bokeh.embed import components
 import bokeh
 import bokeh.plotting as bk
+from bokeh.models import ColumnDataSource
 
 from astropy.time import Time
 from bokeh.models import HoverTool, ColumnDataSource
@@ -68,6 +69,38 @@ def plot_timeseries(times, values, name, color, x_range=None):
     return fig
 
 
+def get_nightlytable(exposures):
+    '''
+    Generates a summary table of the exposures from the night observed.
+    
+    Args:
+        exposures: Table of exposures with columns...
+        
+    Returns a bokeh DataTable object.
+    '''
+    from bokeh.models.widgets.tables import DataTable, TableColumn
+    
+    source = ColumnDataSource(data=dict(
+        expid = np.array(exposures['EXPID']),
+        flavor = np.array(exposures['FLAVOR'], dtype='str'),
+        program = np.array(exposures['PROGRAM'], dtype='str'),
+        exptime = np.array(exposures['EXPTIME']),
+        tileid = np.array(exposures['TILEID']),
+    ))
+
+    columns = [
+        TableColumn(field='expid', title='Exposure ID'),
+        TableColumn(field='flavor', title='Flavor'),
+        TableColumn(field='program', title='Program'),
+        TableColumn(field='exptime', title='Exposure Time'),
+        TableColumn(field='tileid', title='Tile ID'),  
+    ]
+
+    nightly_table = DataTable(source=source, columns=columns, sortable=True)
+    
+    return nightly_table
+
+
 def makeplots(night, exposures, tiles, outdir):
     '''
     Generates summary plots for the DESI survey QA
@@ -99,6 +132,10 @@ def makeplots(night, exposures, tiles, outdir):
     #- Convert these to the components to include in the HTML
     timeseries_script, timeseries_div = components(bk.Column(airmass, seeing, exptime))
 
+    #making the nightly table of values
+    nightlytable = get_nightlytable(exposures)
+    table_script, table_div = components(nightlytable)
+    
     #----
     #- Template HTML for this page
     
@@ -112,23 +149,53 @@ def makeplots(night, exposures, tiles, outdir):
         href="https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.css"
         rel="stylesheet" type="text/css"
     >
+    <link
+        href="https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.css"
+        rel="stylesheet" type="text/css"
+    >
     <script 
         src="https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.js"
+    ></script>
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.js"
     ></script>
     """.format(version=bokeh.__version__)
 
     #- Now add the HTML body with template placeholders for plots
+    
     template = header + """
+    <head>
+    <style>
+    .flex-container {
+        display: flex;
+        flex-flow: row wrap;
+        justify-content: space-between;
+    }
+    </style>
+    </head>
+    """
+    template += """
     <body>
 
         <h1>Night {}</h1>
     """.format(night)
 
     template += """
-        {{ timeseries_script }}
-    
-        {{ timeseries_div }}
-
+        <div class="flex-container">
+            <div> SKY PATH PLOT HERE </div>
+            <div> NIGHTLY TOTALS BAR CHART HERE </div>
+        </div>
+        
+        <div class="flex-container">
+            <div>{{ timeseries_script }} {{ timeseries_div }}</div>
+            <div> NIGHT VS. SUMMARY HISTOGRAMS HERE </div>
+        </div>
+        
+        <p>Night Summary Table: </p>
+        
+        {{ table_script }} 
+        
+        {{ table_div }}
+        
         <p>etc.  Add more plots...</p>
     
     </body>
@@ -139,6 +206,7 @@ def makeplots(night, exposures, tiles, outdir):
     #- Convert to a jinja2.Template object and render HTML
     html = jinja2.Template(template).render(
         timeseries_script=timeseries_script, timeseries_div=timeseries_div,
+        table_script=table_script, table_div=table_div
         )
 
     #- Write output file for this night
