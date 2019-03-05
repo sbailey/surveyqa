@@ -136,6 +136,10 @@ def makeplots(night, exposures, tiles, outdir):
     nightlytable = get_nightlytable(exposures)
     table_script, table_div = components(nightlytable)
     
+    #adding in the skyplot components
+    skypathplot = get_skypathplot(exposures, tiles, night)
+    skypathplot_script, skypathplot_div = components(skypathplot)
+    
     #----
     #- Template HTML for this page
     
@@ -181,7 +185,7 @@ def makeplots(night, exposures, tiles, outdir):
 
     template += """
         <div class="flex-container">
-            <div> SKY PATH PLOT HERE </div>
+            <div>{{ skypathplot_script }} {{ skypathplot_div}}</div>
             <div> NIGHTLY TOTALS BAR CHART HERE </div>
         </div>
         
@@ -205,6 +209,7 @@ def makeplots(night, exposures, tiles, outdir):
 
     #- Convert to a jinja2.Template object and render HTML
     html = jinja2.Template(template).render(
+        skypathplot_script=skypathplot_script, skypathplot_div=skypathplot_div,
         timeseries_script=timeseries_script, timeseries_div=timeseries_div,
         table_script=table_script, table_div=table_div
         )
@@ -218,7 +223,7 @@ def makeplots(night, exposures, tiles, outdir):
     
 
     
-def plot_observed_tiles(exposures, tiles, night):
+def get_skypathplot(exposures, tiles, night):
     """
     Generate a plot which maps the location of tiles observed on NIGHT
     
@@ -258,5 +263,5 @@ def plot_observed_tiles(exposures, tiles, night):
     fig.add_tools(obs_hover)
 
     #shows plot
-    bk.show(fig)
+    return fig
     
