@@ -223,7 +223,7 @@ def makeplots(night, exposures, tiles, outdir):
     
 
     
-def get_skypathplot(exposures, tiles, night):
+def get_skypathplot(exposures, tiles, night, width=600, height=300):
     """
     Generate a plot which maps the location of tiles observed on NIGHT
     
@@ -231,6 +231,11 @@ def get_skypathplot(exposures, tiles, night):
         exposures : Table of exposures with columns ...
         tiles: Table of tile locations with columns ...
         night : String representing a single value in the NIGHT column of the EXPOSURES table
+        
+    Options:
+        height, width = height and width of the graph in pixels
+        
+    Returns a bokeh figure object
     """
     exposures = find_night(exposures, night)
     
@@ -246,7 +251,7 @@ def get_skypathplot(exposures, tiles, night):
     night_name = exposures['NIGHT'][0]
     string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
 
-    fig = bk.figure(width=600, height=300, title='Tiles observed on ' + string_date)
+    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
     fig.yaxis.axis_label = 'Declination'
     fig.xaxis.axis_label = 'Right Ascension'
 
