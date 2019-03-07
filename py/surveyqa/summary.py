@@ -222,17 +222,20 @@ def get_surveyprogress(exposures, tiles, width=300, height=300):
             data=dict(
                 x=t,
                 y=[0, 1],
-                date=[t1.strftime("%a, %d %b %Y %H:%M") for t1 in x_d],
+                date=[t1.strftime("%a, %d %b %Y %H:%M") for t1 in t],
             )
         )
+
+    fig1.xaxis.major_label_orientation = np.pi/4
 
     fig1.line('x', 'y', source=source_d, line_width=2, color = "red", legend = "DARK")
     fig1.line('x', 'y', source=source_g, line_width=2, color = "blue", legend = "GREY")
     fig1.line('x', 'y', source=source_b, line_width=2, color = "green", legend = "BRIGHT")
-    fig1.line('x', 'y', source=source_line, line_width=2, color = "grey", legend = "Ideal progress", line_dash = "dashed")
+    fig1.line('x', 'y', source=source_line, line_width=2, color = "grey", line_dash = "dashed")
 
     fig1.legend.location = "top_left"
     fig1.legend.click_policy="hide"
+    fig1.legend.spacing = 0
 
     fig1.add_tools(hover)
     return fig1
@@ -258,7 +261,7 @@ def get_surveyTileprogress(exposures, tiles, width=300, height=300):
     tzone = TimezoneInfo(utc_offset = -7*u.hour)
 
     def bgd(string):
-        tne_d = exposures[exposures["PROGRAM"] == string]
+        tne_d = exposures_nocalib[exposures_nocalib["PROGRAM"] == string]
         x_d = np.array(tne_d['MJD'])
         s = 0
         y_d = np.array([])
@@ -307,21 +310,42 @@ def get_surveyTileprogress(exposures, tiles, width=300, height=300):
     startend = np.array([np.min(exposures_nocalib['MJD']), np.min(exposures_nocalib['MJD']) + 365.2422*5])
     t1 = Time(startend, format='mjd', scale='utc')
     t = t1.to_datetime(timezone=tzone)
-    source_line = ColumnDataSource(
+    source_line_d = ColumnDataSource(
             data=dict(
                 x=t,
-                y=[0, len(tiles["TILEID"])],
-                date=[t1.strftime("%a, %d %b %Y %H:%M") for t1 in x_d],
+                y=[0, len(tiles[tiles["PROGRAM"] == "DARK"])],
+                date=[t1.strftime("%a, %d %b %Y %H:%M") for t1 in t],
             )
         )
 
+    source_line_g = ColumnDataSource(
+            data=dict(
+                x=t,
+                y=[0, len(tiles[tiles["PROGRAM"] == "GRAY"])],
+                date=[t1.strftime("%a, %d %b %Y %H:%M") for t1 in t],
+            )
+        )
+
+    source_line_b = ColumnDataSource(
+            data=dict(
+                x=t,
+                y=[0, len(tiles[tiles["PROGRAM"] == "BRIGHT"])],
+                date=[t1.strftime("%a, %d %b %Y %H:%M") for t1 in t],
+            )
+        )
+
+    fig.xaxis.major_label_orientation = np.pi/4
+
+    fig.line('x', 'y', source=source_line_d, line_width=2, color = "red", line_dash = "dashed", alpha = 0.5)
+    fig.line('x', 'y', source=source_line_g, line_width=2, color = "blue", line_dash = "dashed", alpha = 0.5)
+    fig.line('x', 'y', source=source_line_b, line_width=2, color = "green", line_dash = "dashed", alpha = 0.5)
     fig.line('x', 'y', source=source_d, line_width=2, color = "red", legend = "DARK")
-    fig.line('x', 'y', source=source_g, line_width=2, color = "blue", legend = "GREY")
+    fig.line('x', 'y', source=source_g, line_width=2, color = "blue", legend = "GRAY")
     fig.line('x', 'y', source=source_b, line_width=2, color = "green", legend = "BRIGHT")
-    fig.line('x', 'y', source=source_line, line_width=2, color = "grey", legend = "Ideal progress", line_dash = "dashed")
 
     fig.legend.location = "top_left"
     fig.legend.click_policy="hide"
+    fig.legend.spacing = 0
 
     fig.add_tools(hover)
     return fig
@@ -427,10 +451,10 @@ def makeplots(exposures, tiles, outdir):
 
     template += """
         <p>Progress: </p>
-        <div align="center">
-        <div class="flex-container", align="center">
+        <div class="flex-container">
             <div align="center">{{ skyplot_script }} {{ skyplot_div }}</div>
-        </div>
+            <div>{{ progress_script }} {{ progress_div }}</div>
+            <div>{{ progress_script_1 }} {{ progress_div_1 }}</div>
         </div>
 
         <p>Histograms: </p>
@@ -444,8 +468,6 @@ def makeplots(exposures, tiles, outdir):
         <br>
         <div class="flex-container">
             <div>{{ exposeTimes_hist_script }} {{ exposeTimes_hist_div }}</div>
-            <div>{{ progress_script }} {{ progress_div }}</div>
-            <div>{{ progress_script_1 }} {{ progress_div_1 }}</div>
         </div>
         <p>Summary Table: </p>
 
@@ -460,13 +482,13 @@ def makeplots(exposures, tiles, outdir):
     </html>
     """
 
-    skyplot = get_skyplot(exposures, tiles, 700, 300)
+    skyplot = get_skyplot(exposures, tiles)
     skyplot_script, skyplot_div = components(skyplot)
 
-    progressplot = get_surveyprogress(exposures, tiles, 400, 400)
+    progressplot = get_surveyprogress(exposures, tiles)
     progress_script, progress_div = components(progressplot)
 
-    progressplot_1 = get_surveyTileprogress(exposures, tiles, 400, 400)
+    progressplot_1 = get_surveyTileprogress(exposures, tiles)
     progress_script_1, progress_div_1 = components(progressplot_1)
 
     summarytable = get_summarytable(exposures)
@@ -484,7 +506,7 @@ def makeplots(exposures, tiles, outdir):
     exposePerTile_hist = get_exposuresPerTile_hist(exposures, "orange")
     exposePerTile_hist_script, exposePerTile_hist_div = components(exposePerTile_hist)
 
-    exposeTimes_hist = get_exposeTimes_hist(exposures, 400, 400)
+    exposeTimes_hist = get_exposeTimes_hist(exposures)
     exposeTimes_hist_script, exposeTimes_hist_div = components(exposeTimes_hist)
 
     #- Convert to a jinja2.Template object and render HTML
