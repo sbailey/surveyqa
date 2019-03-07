@@ -156,9 +156,37 @@ def get_surveyprogress(exposures, tiles, width=300, height=300):
     y = np.cumsum(np.random.uniform(size=len(x)))
     fig.line(x, y)
     fig.title.text = 'Placeholder: Survey Progress'
+    fig.xaxis.axis_label = 'Time'
+    fig.yaxis.axis_label = 'Progress'
 
     return fig
+
+def get_summaryhistogram(exposures, bins, attribute='AIRMASS', width=300, height=300, fill_color='blue'):
+    '''
+    Generates a histogram of values for exposures over the entire survey
     
+    Args:
+        exposures: Table of exposures with columns...
+        bins: integer number of bins for histogram
+    
+    Options:
+        attribute: the column you want to plot as the histogram (ex: airmass, seeing, exptime) (string)
+        width, height: plot width and height in pixels (integer)
+        fill_color: fill color of the histogram (string)
+        
+    Returns a bokeh figure object
+    
+    NOTE: this is just my placeholder function, will replace with William's function later
+    '''
+    
+    hist, edges = np.histogram(exposures[attribute], bins=bins)
+    fig = bk.figure(width=width, height=height)
+    fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:],
+           fill_color=fill_color)
+    fig.title.text = '{} Histogram'.format(attribute)
+    
+    return fig
+
 def makeplots(exposures, tiles, outdir):
     '''
     Generates summary plots for the DESI survey QA
@@ -196,10 +224,41 @@ def makeplots(exposures, tiles, outdir):
     template = header + """
     <head>
     <style>
+    body {
+        margin: 0;
+    }
+    
+    .header {
+        font-family: "Open Serif", Arial, Helvetica, sans-serif;
+        background-color: #f1f1f1;
+        padding: 20px;
+        text-align: center;
+        justify: space-around;
+    }
+ 
+    .column {
+        float: center;
+        padding: 10px
+    }
+    
+    .column.side {
+        width = 20%;
+    }
+    
+    .column.middle {
+        width = 60%;
+    }
+    
     .flex-container {
         display: flex;
         flex-direction: row;
-        flex-flow: row wrap;    
+        flex-flow: row wrap;
+        justify-content: space-around;
+        padding: 20px;
+    }
+    
+    p.sansserif {
+        font-family: "Open Serif", Helvetica, sans-serif;
     }
     </style>
     </head>
@@ -207,35 +266,47 @@ def makeplots(exposures, tiles, outdir):
     
     template += """
     <body>
-
-        <h1>DESI Survey QA</h1>
-        <p>Through night {}</p>
+        <div class="header">
+            <h1>DESI SURVEY QA</h1>
+            <p>Through night {}</p>
+        </div>
     """.format(max(exposures['NIGHT']))
     
     template += """
-        <p>Progress: </p>
         <div class="flex-container">
-            <div>{{ skyplot_script }} {{ skyplot_div }}</div>
-            <div>{{ progress_script }} {{ progress_div }}</div>
-            <div>{{ progress_script_1 }} {{ progress_div_1 }}</div>
+            <div class="column side"></div>          
+            <div class="column middle">
+                <div class="header">
+                    <p class="sansserif">Progress Graphs</p>
+                </div> 
+                
+                <div class="flex-container">
+                    <div>{{ skyplot_script }} {{ skyplot_div }}</div>
+                    <div>{{ progress_script }} {{ progress_div }}</div>
+                    <div>{{ progress_script_1 }} {{ progress_div_1 }}</div>
+                </div>    
+                
+                <div class="header">
+                    <p class="sansserif">Histograms</p>
+                </div>
+                
+                <div class="flex-container">
+                    <div>{{ airmass_script }} {{airmass_div }}</div>
+                    <div>{{ seeing_script }} {{ seeing_div }}</div>
+                    <div>{{ exptime_script }} {{ exptime_div }}</div>
+                </div> 
+                
+                <div class="header">
+                    <p class="sansserif">Summary Table</p>
+                </div>
+                
+                <div class="flex-container">
+                    {{ summarytable_script }}
+                    {{ summarytable_div }}
+                </div>     
+            </div>
+            <div class="column side"></div>
         </div>
-        
-        <p>Histograms: </p>
-        
-        <div class="flex-container">
-            <div>HISTOGRAMS GO HERE</div>
-            <div>AND HERE</div>
-            <div>AND HERE</div>
-        </div>
-        
-        <p>Summary Table: </p>
-        
-        {{ summarytable_script }}
-        
-        {{ summarytable_div }}
-
-        <p>etc.  Add more plots...</p>
-
     </body>
 
     </html>
@@ -253,12 +324,24 @@ def makeplots(exposures, tiles, outdir):
     summarytable = get_summarytable(exposures)
     summarytable_script, summarytable_div = components(summarytable)
 
+    airmass_hist = get_summaryhistogram(exposures, 20, attribute="AIRMASS")
+    airmass_script, airmass_div = components(airmass_hist)
+
+    seeing_hist = get_summaryhistogram(exposures, 20, attribute="SEEING")
+    seeing_script, seeing_div = components(seeing_hist)
+
+    exptime_hist = get_summaryhistogram(exposures, 20, attribute="EXPTIME")
+    exptime_script, exptime_div = components(exptime_hist)
+
     #- Convert to a jinja2.Template object and render HTML
     html = jinja2.Template(template).render(
         skyplot_script=skyplot_script, skyplot_div=skyplot_div,
         progress_script=progress_script, progress_div=progress_div,
         progress_script_1=progress_script_1, progress_div_1=progress_div_1,
-        summarytable_script=summarytable_script, summarytable_div=summarytable_div, 
+        summarytable_script=summarytable_script, summarytable_div=summarytable_div,
+        airmass_script=airmass_script, airmass_div=airmass_div, 
+        seeing_script=seeing_script, seeing_div=seeing_div,
+        exptime_script=exptime_script, exptime_div=exptime_div,
         )
     
     outfile = os.path.join(outdir, 'summary.html')
