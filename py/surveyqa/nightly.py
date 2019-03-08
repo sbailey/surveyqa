@@ -128,6 +128,10 @@ def makeplots(night, exposures, tiles, outdir):
     
     #- Filter exposures to just this night and adds columns DATETIME and MJD_hour
     exposures = find_night(exposures, night)
+    
+    #- Separate calibration exposures
+    calibs = exposures[exposures['PROGRAM'] == 'CALIB']
+    exposures = exposures[exposures['PROGRAM'] != 'CALIB']
 
     title='Airmass, Seeing, Exptime vs. Time for {}/{}/{}'.format(night[4:6], night[6:], night[:4])
     #- Get timeseries plots for several variables
