@@ -20,6 +20,10 @@ from astropy.time import TimezoneInfo
 import astropy.units as u
 from datetime import tzinfo
 from datetime import datetime
+from bokeh.models.glyphs import HBar
+from bokeh.models import LabelSet, FactorRange
+from bokeh.palettes import Spectral6
+from bokeh.transform import factor_cmap
 
 def find_night(exposures, night):
     """
@@ -61,7 +65,7 @@ def plot_timeseries(times, values, name, color, x_range=None, title=None):
 
     Returns bokeh Figure object
     '''
-    fig = bk.figure(width=400, height=250, toolbar_location=None, 
+    fig = bk.figure(width=400, height=150, toolbar_location=None, 
                     x_axis_type='datetime', x_range=x_range, 
                     active_scroll='wheel_zoom', title=title)
     fig.line(times, values)
@@ -117,9 +121,12 @@ def makeplots(night, exposures, tiles, outdir):
 
     Writes outdir/night-*.html
     '''
-
+    
+    #- Separate calibration exposures
+    calibs = exposures[exposures['PROGRAM'] == 'CALIB']
+    exposures = exposures[exposures['PROGRAM'] != 'CALIB']
+    
     #- Filter exposures to just this night and adds columns DATETIME and MJD_hour
-    #- Note: this replaces local variable but does not modify original input (good)
     exposures = find_night(exposures, night)
 
     title='Airmass, Seeing, Exptime vs. Time for {}/{}/{}'.format(night[4:6], night[6:], night[:4])
@@ -143,6 +150,11 @@ def makeplots(night, exposures, tiles, outdir):
     #adding in the skyplot components
     skypathplot = get_skypathplot(exposures, tiles, night)
     skypathplot_script, skypathplot_div = components(skypathplot)
+    
+    #adding in the components of the exposure types bar plot
+    exptypecounts = get_exptype_counts(exposures, calibs)
+    exptypecounts_script, exptypecounts_div = components(exptypecounts)
+    
     
     #----
     #- Template HTML for this page
@@ -268,4 +280,43 @@ def get_skypathplot(exposures, tiles, night):
 
     #shows plot
     return fig
+
+
+def get_exptype_counts(exposures, calibs):
+    """
+    Generate a horizontal bar plot showing the counts for each type of exposure grouped 
+    by whether they have FLAVOR='science' or PROGRAM='calib'
+    
+    ARGS:
+        exposures : a table of exposures which only contain those with FLAVOR='science'
+        calibs : a table of exposures which only contains those with PROGRAm='calibs'
+    """
+    darks = len(exposures[exposures['PROGRAM'] == 'DARK'])
+    grays = len(exposures[exposures['PROGRAM'] == 'GRAY'])
+    brights = len(exposures[exposures['PROGRAM'] == 'BRIGHTS'])
+    
+    arcs = len(calibs[calibs['FLAVOR'] == 'arc'])
+    flats = len(calibs[calibs['FLAVOR'] == 'flat'])
+    zeroes = len(calibs[calibs['FLAVOR'] == 'zero'])
+    
+    
+    types = [('calib', 'ZERO'), ('calib', 'FLAT'), ('calib', 'ARC'), 
+            ('science', 'BRIGHT'), ('science', 'GRAY'), ('science', 'DARK')]
+    counts = np.array([zeroes, flats, arcs, brights, grays, darks])
+    
+    src = ColumnDataSource({'types':types, 'counts':counts})
+    
+    p = bk.figure(y_range=FactorRange(*types), title='Exposure Type Counts', 
+                  toolbar_location=None)
+    p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white',
+           fill_color=factor_cmap('types', palette=Spectral6, factors=types), source=src)
+    
+    
+    labels = LabelSet(x='counts', y='types', text='counts', level='glyph', source=src, 
+                      render_mode='canvas', x_offset=5, y_offset=-10, text_color='gray', text_font='sans-serif')
+    p.add_layout(labels)
+    
+    p.ygrid.grid_line_color=None
+    
+    return p
     
