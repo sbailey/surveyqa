@@ -320,21 +320,6 @@ def makeplots(night, exposures, tiles, outdir):
         fx.write(html)
 
     print('Wrote {}'.format(outfile))
-    
-    #plots of all tiles
-    unobs = fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
-
-    #plots tiles observed on NIGHT
-    obs = fig.circle('RA', 'DEC', color='blue', size=3, legend='Observed', source=src)
-    fig.line(src.data['RA'], src.data['DEC'], color='black')
-
-    #adds hover tool
-    TOOLTIPS = [("(RA, DEC)", "($x, $y)"), ("EXPID", "@EXPID")]
-    obs_hover = HoverTool(renderers = [obs], tooltips=TOOLTIPS)
-    fig.add_tools(obs_hover)
-
-    #shows plot
-    return fig
 
 
 def get_exptype_counts(exposures, calibs):
