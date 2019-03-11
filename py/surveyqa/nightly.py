@@ -13,26 +13,33 @@ import bokeh.plotting as bk
 from bokeh.models import ColumnDataSource
 
 from astropy.time import Time
-from bokeh.models import HoverTool, ColumnDataSource
+from bokeh.models import HoverTool
 from bokeh.layouts import gridplot
 from astropy.table import join
-
+from astropy.time import TimezoneInfo
+import astropy.units as u
+from datetime import tzinfo
+from datetime import datetime
+from bokeh.models.glyphs import HBar
+from bokeh.models import LabelSet, FactorRange
+from bokeh.palettes import Spectral6
+from bokeh.transform import factor_cmap
 
 def find_night(exposures, night):
     """
-    Generates a subtable of exposures corresponding to data from a single night N and adds columns DATETIME and MJD_hour
+    Generates a subtable of exposures corresponding to data from a single night N and adds column TIME
     
     ARGS:
         exposures : Table of exposures with columns
         night : A string representing a single value in the NIGHT column of the EXPOSURES table
     """
     exposures = exposures[exposures['NIGHT'] == night]
-
-    mjds = Time(np.array(exposures['MJD']), format='mjd')
-    exposures['DATETIME'] = mjds
-    mjd_ints = np.array(exposures['MJD']).astype(int)
-    mjd_hours = (np.array(exposures['MJD']) - mjd_ints) * 24
-    exposures['MJD_hour'] = mjd_hours
+    
+    mjds = np.array(exposures['MJD'])
+    tzone = TimezoneInfo(utc_offset = -7*u.hour)
+    times = [Time(mjd, format='mjd', scale='utc').to_datetime(timezone=tzone) for mjd in mjds]    
+    
+    exposures['TIME'] = times
     return exposures
 
 
@@ -40,12 +47,12 @@ def get_timeseries(exposures, tiles, name):
     '''
     Generates times and values arrays for column `name`
     '''
-    x = np.array(exposures['MJD_hour'])
+    x = np.array(exposures['TIME'])
     y = np.array(exposures[name])
     return x, y
 
 
-def plot_timeseries(times, values, name, color, x_range=None):
+def plot_timeseries(times, values, name, color, x_range=None, title=None):
     '''
     Plots VALUES vs. TIMES
 
@@ -58,7 +65,9 @@ def plot_timeseries(times, values, name, color, x_range=None):
 
     Returns bokeh Figure object
     '''
-    fig = bk.figure(width=400, height=250, toolbar_location=None, x_range=x_range, active_scroll='wheel_zoom')
+    fig = bk.figure(width=400, height=150, toolbar_location=None, 
+                    x_axis_type='datetime', x_range=x_range, 
+                    active_scroll='wheel_zoom', title=title)
     fig.line(times, values)
     fig.circle(times, values, line_color=color, fill_color='white', size=6, line_width=2)
     fig.ygrid.grid_line_color = None
@@ -160,21 +169,28 @@ def makeplots(night, exposures, tiles, outdir):
 
     Writes outdir/night-*.html
     '''
-
+    
+    #- Separate calibration exposures
+    calibs = exposures[exposures['PROGRAM'] == 'CALIB']
+    exposures = exposures[exposures['PROGRAM'] != 'CALIB']
+    
     #- Filter exposures to just this night and adds columns DATETIME and MJD_hour
-    #- Note: this replaces local variable but does not modify original input (good)
     exposures = find_night(exposures, night)
+    
+    #- Separate calibration exposures
+    calibs = exposures[exposures['PROGRAM'] == 'CALIB']
+    exposures = exposures[exposures['PROGRAM'] != 'CALIB']
 
+    title='Airmass, Seeing, Exptime vs. Time for {}/{}/{}'.format(night[4:6], night[6:], night[:4])
     #- Get timeseries plots for several variables
     x, y = get_timeseries(exposures, tiles, 'AIRMASS')
-    airmass = plot_timeseries(x, y, 'AIRMASS', 'darkorange')
+    airmass = plot_timeseries(x, y, 'AIRMASS', 'darkorange', x_range=None, title=title)
 
     x, y = get_timeseries(exposures, tiles, 'SEEING')
     seeing = plot_timeseries(x, y, 'SEEING', 'navy', x_range=airmass.x_range)
 
     x, y = get_timeseries(exposures, tiles, 'EXPTIME')
     exptime = plot_timeseries(x, y, 'EXPTIME', 'green', x_range=airmass.x_range)
-
 
     #- Convert these to the components to include in the HTML
     timeseries_script, timeseries_div = components(bk.Column(airmass, seeing, exptime))
@@ -186,6 +202,11 @@ def makeplots(night, exposures, tiles, outdir):
     #adding in the skyplot components
     skypathplot = get_skypathplot(exposures, tiles, night)
     skypathplot_script, skypathplot_div = components(skypathplot)
+    
+    #adding in the components of the exposure types bar plot
+    exptypecounts = get_exptype_counts(exposures, calibs)
+    exptypecounts_script, exptypecounts_div = components(exptypecounts)
+    
     
     #----
     #- Template HTML for this page
@@ -300,7 +321,57 @@ def makeplots(night, exposures, tiles, outdir):
 
     print('Wrote {}'.format(outfile))
     
+    #plots of all tiles
+    unobs = fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
 
+    #plots tiles observed on NIGHT
+    obs = fig.circle('RA', 'DEC', color='blue', size=3, legend='Observed', source=src)
+    fig.line(src.data['RA'], src.data['DEC'], color='black')
+
+    #adds hover tool
+    TOOLTIPS = [("(RA, DEC)", "($x, $y)"), ("EXPID", "@EXPID")]
+    obs_hover = HoverTool(renderers = [obs], tooltips=TOOLTIPS)
+    fig.add_tools(obs_hover)
+
+    #shows plot
+    return fig
+
+
+def get_exptype_counts(exposures, calibs):
+    """
+    Generate a horizontal bar plot showing the counts for each type of exposure grouped 
+    by whether they have FLAVOR='science' or PROGRAM='calib'
     
-
+    ARGS:
+        exposures : a table of exposures which only contain those with FLAVOR='science'
+        calibs : a table of exposures which only contains those with PROGRAm='calibs'
+    """
+    darks = len(exposures[exposures['PROGRAM'] == 'DARK'])
+    grays = len(exposures[exposures['PROGRAM'] == 'GRAY'])
+    brights = len(exposures[exposures['PROGRAM'] == 'BRIGHTS'])
+    
+    arcs = len(calibs[calibs['FLAVOR'] == 'arc'])
+    flats = len(calibs[calibs['FLAVOR'] == 'flat'])
+    zeroes = len(calibs[calibs['FLAVOR'] == 'zero'])
+    
+    
+    types = [('calib', 'ZERO'), ('calib', 'FLAT'), ('calib', 'ARC'), 
+            ('science', 'BRIGHT'), ('science', 'GRAY'), ('science', 'DARK')]
+    counts = np.array([zeroes, flats, arcs, brights, grays, darks])
+    
+    src = ColumnDataSource({'types':types, 'counts':counts})
+    
+    p = bk.figure(y_range=FactorRange(*types), title='Exposure Type Counts', 
+                  toolbar_location=None)
+    p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white',
+           fill_color=factor_cmap('types', palette=Spectral6, factors=types), source=src)
+    
+    
+    labels = LabelSet(x='counts', y='types', text='counts', level='glyph', source=src, 
+                      render_mode='canvas', x_offset=5, y_offset=-10, text_color='gray', text_font='sans-serif')
+    p.add_layout(labels)
+    
+    p.ygrid.grid_line_color=None
+    
+    return p
     
