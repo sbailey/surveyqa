@@ -133,7 +133,7 @@ def get_summarytable(exposures):
         TableColumn(field='brights', title='Bright Exposures'),
         TableColumn(field='grays', title='Gray Exposures'),
         TableColumn(field='darks', title='Dark Exposures'),
-        TableColumn(field='calib', title='Calibrations'),
+        TableColumn(field='calibs', title='Calibrations'),
     ]
 
     summary_table = DataTable(source=source, columns=columns, sortable=True)
@@ -187,8 +187,7 @@ def get_surveyprogress(exposures, tiles, width=300, height=300):
             ]
         )
 
-    fig1 = bk.figure(plot_width=width, plot_height=height, title = "Progress(Total covered ExposeFac) vs time", x_axis_label = "Time",
-                    y_axis_label = "Fraction", x_axis_type="datetime")
+    fig1 = bk.figure(plot_width=width, plot_height=height, title = "Progress(ExposeFac Weighted) vs Time", x_axis_label = "Time", y_axis_label = "Fraction", x_axis_type="datetime")
     x_d, y_d = bgd("DARK")
     x_g, y_g = bgd("GRAY")
     x_b, y_b = bgd("BRIGHT")
@@ -394,33 +393,6 @@ def get_exposeTimes_hist(exposures, width=600, height=400):
     exptime_dgb("BRIGHT", "green")
 
     fig.legend.click_policy="hide"
-    return fig
-
-#- TODO: combine with get_hist, which has duplicate functionality
-def get_summaryhistogram(exposures, bins, attribute='AIRMASS', width=300, height=300, fill_color='blue'):
-    '''
-    Generates a histogram of values for exposures over the entire survey
-    
-    Args:
-        exposures: Table of exposures with columns...
-        bins: integer number of bins for histogram
-    
-    Options:
-        attribute: the column you want to plot as the histogram (ex: airmass, seeing, exptime) (string)
-        width, height: plot width and height in pixels (integer)
-        fill_color: fill color of the histogram (string)
-        
-    Returns a bokeh figure object
-    
-    NOTE: this is just my placeholder function, will replace with William's function later
-    '''
-    
-    hist, edges = np.histogram(exposures[attribute], bins=bins)
-    fig = bk.figure(width=width, height=height)
-    fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:],
-           fill_color=fill_color)
-    fig.title.text = '{} Histogram'.format(attribute)
-    
     return fig
 
 def makeplots(exposures, tiles, outdir):
