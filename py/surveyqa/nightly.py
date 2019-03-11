@@ -109,6 +109,54 @@ def get_nightlytable(exposures):
     return nightly_table
 
 
+def get_skypathplot(exposures, tiles, night, width=600, height=300):
+    """
+    Generate a plot which maps the location of tiles observed on NIGHT
+    
+    ARGS:
+        exposures : Table of exposures with columns ...
+        tiles: Table of tile locations with columns ...
+        night : String representing a single value in the NIGHT column of the EXPOSURES table
+        
+    Options:
+        height, width = height and width of the graph in pixels
+        
+    Returns a bokeh figure object
+    """
+    exposures = find_night(exposures, night)
+    
+    #merges tiles data for all exposures on a single night N
+    tiles_and_exps = join(exposures, tiles['STAR_DENSITY', 'EXPOSEFAC', 'OBSCONDITIONS', 'TILEID'], keys='TILEID')
+    
+    #converts data format into ColumnDataSource
+    src = ColumnDataSource(data={'RA':np.array(tiles_and_exps['RA']), 
+                                 'DEC':np.array(tiles_and_exps['DEC']), 
+                                 'EXPID':np.array(tiles_and_exps['EXPID'])})
+    
+    #plot options
+    night_name = exposures['NIGHT'][0]
+    string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
+
+    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
+    fig.yaxis.axis_label = 'Declination'
+    fig.xaxis.axis_label = 'Right Ascension'
+
+    #plots of all tiles
+    unobs = fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
+
+    #plots tiles observed on NIGHT
+    obs = fig.circle('RA', 'DEC', color='blue', size=3, legend='Observed', source=src)
+    fig.line(src.data['RA'], src.data['DEC'], color='black')
+
+    #adds hover tool
+    TOOLTIPS = [("(RA, DEC)", "($x, $y)"), ("EXPID", "@EXPID")]
+    obs_hover = HoverTool(renderers = [obs], tooltips=TOOLTIPS)
+    fig.add_tools(obs_hover)
+
+    #shows plot
+    return fig
+
+
 def makeplots(night, exposures, tiles, outdir):
     '''
     Generates summary plots for the DESI survey QA
@@ -189,39 +237,71 @@ def makeplots(night, exposures, tiles, outdir):
     template = header + """
     <head>
     <style>
+    body {
+        margin: 0;
+    }
+    
+    .header {
+        font-family: "Open Serif", Arial, Helvetica, sans-serif;
+        background-color: #f1f1f1;
+        padding: 20px;
+        text-align: center;
+        justify: space-around;
+    }
+ 
+    .column {
+        float: center;
+        padding: 10px
+    }
+    
+    .column.side {
+        width = 10%;
+    }
+    
+    .column.middle {
+        width = 80%;
+    }
+    
     .flex-container {
         display: flex;
+        flex-direction: row;
         flex-flow: row wrap;
-        justify-content: space-between;
+        justify-content: space-around;
+        padding: 20px;
+    }
+    
+    p.sansserif {
+        font-family: "Open Serif", Helvetica, sans-serif;
     }
     </style>
     </head>
     """
     template += """
     <body>
-
-        <h1>Night {}</h1>
+        <div class="header">
+            <h1>DESI SURVEY QA</h1>
+            <p>NIGHT: {}</p>
+        </div>
     """.format(night)
 
     template += """
         <div class="flex-container">
-            <div>{{ skypathplot_script }} {{ skypathplot_div}}</div>
-            <div> NIGHTLY TOTALS BAR CHART HERE </div>
-        </div>
-        
-        <div class="flex-container">
-            <div>{{ timeseries_script }} {{ timeseries_div }}</div>
-            <div> NIGHT VS. SUMMARY HISTOGRAMS HERE </div>
-        </div>
-        
-        <p>Night Summary Table: </p>
-        
-        {{ table_script }} 
-        
-        {{ table_div }}
-        
-        <p>etc.  Add more plots...</p>
-    
+                <div class="column side"></div>          
+                <div class="column middle">
+                    <div class="flex-container">
+                        <div>{{ skypathplot_script }} {{ skypathplot_div}}</div>
+                        <div> NIGHTLY TOTALS BAR CHART HERE </div>
+                    </div>    
+                    
+                    <div class="flex-container">
+                        <div>{{ timeseries_script }} {{ timeseries_div }}</div>
+                        <div> NIGHT VS. SUMMARY HISTOGRAMS HERE </div>
+                    </div> 
+
+                    <div class="flex-container">{{ table_script }}{{ table_div }}</div>     
+                </div>
+                <div class="column side"></div>
+            </div>
     </body>
 
     </html>
@@ -240,55 +320,6 @@ def makeplots(night, exposures, tiles, outdir):
         fx.write(html)
 
     print('Wrote {}'.format(outfile))
-    
-
-    
-def get_skypathplot(exposures, tiles, night, width=600, height=300):
-    """
-    Generate a plot which maps the location of tiles observed on NIGHT
-    
-    ARGS:
-        exposures : Table of exposures with columns ...
-        tiles: Table of tile locations with columns ...
-        night : String representing a single value in the NIGHT column of the EXPOSURES table
-        
-    Options:
-        height, width = height and width of the graph in pixels
-        
-    Returns a bokeh figure object
-    """
-    exposures = find_night(exposures, night)
-    
-    #merges tiles data for all exposures on a single night N
-    tiles_and_exps = join(exposures, tiles['STAR_DENSITY', 'EXPOSEFAC', 'OBSCONDITIONS', 'TILEID'], keys='TILEID')
-    
-    #converts data format into ColumnDataSource
-    src = ColumnDataSource(data={'RA':np.array(tiles_and_exps['RA']), 
-                                 'DEC':np.array(tiles_and_exps['DEC']), 
-                                 'EXPID':np.array(tiles_and_exps['EXPID'])})
-    
-    #plot options
-    night_name = exposures['NIGHT'][0]
-    string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
-
-    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
-    fig.yaxis.axis_label = 'Declination'
-    fig.xaxis.axis_label = 'Right Ascension'
-
-    #plots of all tiles
-    unobs = fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
-
-    #plots tiles observed on NIGHT
-    obs = fig.circle('RA', 'DEC', color='blue', size=3, legend='Observed', source=src)
-    fig.line(src.data['RA'], src.data['DEC'], color='black')
-
-    #adds hover tool
-    TOOLTIPS = [("(RA, DEC)", "($x, $y)"), ("EXPID", "@EXPID")]
-    obs_hover = HoverTool(renderers = [obs], tooltips=TOOLTIPS)
-    fig.add_tools(obs_hover)
-
-    #shows plot
-    return fig
 
 
 def get_exptype_counts(exposures, calibs):

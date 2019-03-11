@@ -133,7 +133,7 @@ def get_summarytable(exposures):
         TableColumn(field='brights', title='Bright Exposures'),
         TableColumn(field='grays', title='Gray Exposures'),
         TableColumn(field='darks', title='Dark Exposures'),
-        TableColumn(field='calib', title='Calibrations'),
+        TableColumn(field='calibs', title='Calibrations'),
     ]
 
     summary_table = DataTable(source=source, columns=columns, sortable=True)
@@ -187,8 +187,7 @@ def get_surveyprogress(exposures, tiles, width=300, height=300):
             ]
         )
 
-    fig1 = bk.figure(plot_width=width, plot_height=height, title = "Progress(Total covered ExposeFac) vs time", x_axis_label = "Time",
-                    y_axis_label = "Fraction", x_axis_type="datetime")
+    fig1 = bk.figure(plot_width=width, plot_height=height, title = "Progress(ExposeFac Weighted) vs Time", x_axis_label = "Time", y_axis_label = "Fraction", x_axis_type="datetime")
     x_d, y_d = bgd("DARK")
     x_g, y_g = bgd("GRAY")
     x_b, y_b = bgd("BRIGHT")
@@ -433,10 +432,41 @@ def makeplots(exposures, tiles, outdir):
     template = header + """
     <head>
     <style>
+    body {
+        margin: 0;
+    }
+    
+    .header {
+        font-family: "Open Serif", Arial, Helvetica, sans-serif;
+        background-color: #f1f1f1;
+        padding: 20px;
+        text-align: center;
+        justify: space-around;
+    }
+ 
+    .column {
+        float: center;
+        padding: 10px
+    }
+    
+    .column.side {
+        width = 20%;
+    }
+    
+    .column.middle {
+        width = 60%;
+    }
+    
     .flex-container {
         display: flex;
         flex-direction: row;
         flex-flow: row wrap;
+        justify-content: space-around;
+        padding: 20px;
+    }
+    
+    p.sansserif {
+        font-family: "Open Serif", Helvetica, sans-serif;
     }
     </style>
     </head>
@@ -444,39 +474,49 @@ def makeplots(exposures, tiles, outdir):
 
     template += """
     <body>
-
-        <h1>DESI Survey QA</h1>
-        <p>Through night {}</p>
+        <div class="header">
+            <h1>DESI SURVEY QA</h1>
+            <p>Through night {}</p>
+        </div>
     """.format(max(exposures['NIGHT']))
 
     template += """
-        <p>Progress: </p>
         <div class="flex-container">
-            <div align="center">{{ skyplot_script }} {{ skyplot_div }}</div>
-            <div>{{ progress_script }} {{ progress_div }}</div>
-            <div>{{ progress_script_1 }} {{ progress_div_1 }}</div>
+            <div class="column side"></div>          
+            <div class="column middle">
+                <div class="header">
+                    <p class="sansserif">Progress Graphs</p>
+                </div> 
+                
+                <div class="flex-container">
+                    <div>{{ skyplot_script }} {{ skyplot_div }}</div>
+                    <div>{{ progress_script }} {{ progress_div }}</div>
+                    <div>{{ progress_script_1 }} {{ progress_div_1 }}</div>
+                </div>    
+                
+                <div class="header">
+                    <p class="sansserif">Histograms</p>
+                </div>
+                
+                <div class="flex-container">
+                    <div>{{ airmass_script }} {{airmass_div }}</div>
+                    <div>{{ seeing_script }} {{ seeing_div }}</div>
+                    <div>{{ transp_hist_script }} {{ transp_hist_div }}</div>
+                    <div>{{ exposePerTile_hist_script }} {{ exposePerTile_hist_div }}</div>
+                    <div>{{ exptime_script }} {{ exptime_div }}</div>
+                </div> 
+                
+                <div class="header">
+                    <p class="sansserif">Summary Table</p>
+                </div>
+                
+                <div class="flex-container">
+                    {{ summarytable_script }}
+                    {{ summarytable_div }}
+                </div>     
+            </div>
+            <div class="column side"></div>
         </div>
-
-        <p>Histograms: </p>
-
-        <div class="flex-container">
-            <div>{{ seeing_hist_script }} {{ seeing_hist_div }}</div>
-            <div>{{ airmass_hist_script }} {{ airmass_hist_div }}</div>
-            <div>{{ transp_hist_script }} {{ transp_hist_div }}</div>
-            <div>{{ exposePerTile_hist_script }} {{ exposePerTile_hist_div }}</div>
-        </div>
-        <br>
-        <div class="flex-container">
-            <div>{{ exposeTimes_hist_script }} {{ exposeTimes_hist_div }}</div>
-        </div>
-        <p>Summary Table: </p>
-
-        {{ summarytable_script }}
-
-        {{ summarytable_div }}
-
-        <p>etc.  Add more plots...</p>
-
     </body>
 
     </html>
@@ -495,10 +535,10 @@ def makeplots(exposures, tiles, outdir):
     summarytable_script, summarytable_div = components(summarytable)
 
     seeing_hist = get_hist(exposures, "SEEING", "navy")
-    seeing_hist_script, seeing_hist_div = components(seeing_hist)
+    seeing_script, seeing_div = components(seeing_hist)
 
     airmass_hist = get_hist(exposures, "AIRMASS", "green")
-    airmass_hist_script, airmass_hist_div = components(airmass_hist)
+    airmass_script, airmass_div = components(airmass_hist)
 
     transp_hist = get_hist(exposures, "TRANSP", "purple")
     transp_hist_script, transp_hist_div = components(transp_hist)
@@ -506,8 +546,8 @@ def makeplots(exposures, tiles, outdir):
     exposePerTile_hist = get_exposuresPerTile_hist(exposures, "orange")
     exposePerTile_hist_script, exposePerTile_hist_div = components(exposePerTile_hist)
 
-    exposeTimes_hist = get_exposeTimes_hist(exposures)
-    exposeTimes_hist_script, exposeTimes_hist_div = components(exposeTimes_hist)
+    exptime_hist = get_exposeTimes_hist(exposures)
+    exptime_script, exptime_div = components(exptime_hist)
 
     #- Convert to a jinja2.Template object and render HTML
     html = jinja2.Template(template).render(
@@ -515,11 +555,11 @@ def makeplots(exposures, tiles, outdir):
         progress_script=progress_script, progress_div=progress_div,
         progress_script_1=progress_script_1, progress_div_1=progress_div_1,
         summarytable_script=summarytable_script, summarytable_div=summarytable_div,
-        seeing_hist_script=seeing_hist_script, seeing_hist_div=seeing_hist_div,
-        airmass_hist_script=airmass_hist_script, airmass_hist_div=airmass_hist_div,
+        airmass_script=airmass_script, airmass_div=airmass_div, 
+        seeing_script=seeing_script, seeing_div=seeing_div,
+        exptime_script=exptime_script, exptime_div=exptime_div,
         transp_hist_script=transp_hist_script, transp_hist_div=transp_hist_div,
         exposePerTile_hist_script=exposePerTile_hist_script, exposePerTile_hist_div=exposePerTile_hist_div,
-        exposeTimes_hist_script=exposeTimes_hist_script, exposeTimes_hist_div=exposeTimes_hist_div
         )
 
     outfile = os.path.join(outdir, 'summary.html')
