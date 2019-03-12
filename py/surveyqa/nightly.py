@@ -190,6 +190,43 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
 
     return fig
 
+def get_exptype_counts(exposures, calibs, width=300, height=300):
+    """
+    Generate a horizontal bar plot showing the counts for each type of
+    exposure grouped by whether they have FLAVOR='science' or PROGRAM='calib'
+
+    ARGS:
+        exposures : a table of exposures which only contain those with FLAVOR='science'
+        calibs : a table of exposures which only contains those with PROGRAm='calibs'
+    """
+    darks = len(exposures[exposures['PROGRAM'] == 'DARK'])
+    grays = len(exposures[exposures['PROGRAM'] == 'GRAY'])
+    brights = len(exposures[exposures['PROGRAM'] == 'BRIGHTS'])
+
+    arcs = len(calibs[calibs['FLAVOR'] == 'arc'])
+    flats = len(calibs[calibs['FLAVOR'] == 'flat'])
+    zeroes = len(calibs[calibs['FLAVOR'] == 'zero'])
+
+    types = [('calib', 'ZERO'), ('calib', 'FLAT'), ('calib', 'ARC'),
+            ('science', 'BRIGHT'), ('science', 'GRAY'), ('science', 'DARK')]
+    counts = np.array([zeroes, flats, arcs, brights, grays, darks])
+
+    src = ColumnDataSource({'types':types, 'counts':counts})
+
+    p = bk.figure(width=width, height=height,
+                  y_range=FactorRange(*types), title='Exposure Type Counts',
+                  toolbar_location=None)
+    p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white',
+           fill_color=factor_cmap('types', palette=Spectral6, factors=types), source=src)
+
+
+    labels = LabelSet(x='counts', y='types', text='counts', level='glyph', source=src,
+                      render_mode='canvas', x_offset=5, y_offset=-10, text_color='gray', text_font='sans-serif')
+    p.add_layout(labels)
+
+    p.ygrid.grid_line_color=None
+
+    return p
 
 
 def makeplots(night, exposures, tiles, outdir):
@@ -234,6 +271,9 @@ def makeplots(night, exposures, tiles, outdir):
     skypathplot = get_skypathplot(exposures, tiles, width=600, height=300)
     skypathplot_script, skypathplot_div = components(skypathplot)
     
+    #adding in the components of the exposure types bar plot
+    exptypecounts = get_exptype_counts(exposures, calibs, width=300, height=300)
+    exptypecounts_script, exptypecounts_div = components(exptypecounts)
     
     #----
     #- Template HTML for this page
