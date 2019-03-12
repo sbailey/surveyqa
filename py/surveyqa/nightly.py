@@ -5,6 +5,7 @@ Plots for daily DESI observing
 from __future__ import absolute_import, division, print_function
 import sys, os
 import numpy as np
+import bokeh as bk
 
 import jinja2
 from bokeh.embed import components
@@ -161,7 +162,7 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
     night_name = exposures['NIGHT'][0]
     string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
 
-    fig = bk.figure(width=600, height=300, title='Tiles observed on ' + string_date)
+    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
     fig.yaxis.axis_label = 'Declination'
     fig.xaxis.axis_label = 'Right Ascension'
 
@@ -190,7 +191,7 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
     return fig
 
 
-def get_exptype_counts(exposures, calibs, width=400, height=250):
+def get_exptype_counts(exposures, calibs, width=300, height=300):
     """
     Generate a horizontal bar plot showing the counts for each type of exposure grouped 
     by whether they have FLAVOR='science' or PROGRAM='calib'
@@ -235,6 +236,32 @@ def get_exptype_counts(exposures, calibs, width=400, height=250):
     return p
 
 
+def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, height=300):
+    """
+    Generates an overlaid histogram for a single attribute comparing the distribution 
+    for all of the exposures vs. those from just one night
+    
+    ARGS:
+        all_exposures : a table of all the science exposures
+        night_exposures : a table of all the science exposures for a single night
+        attribute : a string name of a column in the exposures tables
+        color : color of histogram
+    Options:
+        height, width = height and width of the graph in pixels
+    
+    Returns a bokeh figure object
+    """
+    hist_all, edges_all = np.histogram(np.array(all_exposures[attribute]), density=True, bins=50)
+    hist_night, edges_night = np.histogram(np.array(night_exposures[attribute]), density=True, bins=50)
+
+    fig = bk.figure(plot_width=width, plot_height=height, title = attribute + " Histogram",
+                    x_axis_label = attribute, y_axis_label = "Distribution")
+    fig.quad(top=hist_all, bottom=0, left=edges_all[:-1], right=edges_all[1:], fill_color=color, alpha=0.6)
+    fig.quad(top=hist_night, bottom=0, left=edges_night[:-1], right=edges_night[1:], fill_color=color, alpha=0.2)
+    
+    return fig
+
+
 def makeplots(night, exposures, tiles, outdir):
     '''
     Generates summary plots for the DESI survey QA
@@ -247,23 +274,24 @@ def makeplots(night, exposures, tiles, outdir):
 
     Writes outdir/night-*.html
     '''
-    #- Filter exposures to just this night and adds columns DATETIME and MJD_hour
-    exposures = find_night(exposures, night)
-    
     #- Separate calibration exposures
-    calibs = exposures[exposures['PROGRAM'] == 'CALIB']
-    exposures = exposures[exposures['PROGRAM'] != 'CALIB']
+    all_exposures = exposures[exposures['PROGRAM'] != 'CALIB']
+    all_calibs = exposures[exposures['PROGRAM'] == 'CALIB']
 
+    #- Filter exposures to just this night and adds columns DATETIME and MJD_hour
+    exposures = find_night(all_exposures, night)
+    calibs = find_night(all_calibs, night)
+    
     title='Airmass, Seeing, Exptime vs. Time for {}/{}/{}'.format(night[4:6], night[6:], night[:4])
     #- Get timeseries plots for several variables
     x, y = get_timeseries(exposures, 'AIRMASS')
-    airmass = plot_timeseries(x, y, 'AIRMASS', 'darkorange', x_range=None, title=title)
+    airmass = plot_timeseries(x, y, 'AIRMASS', 'green', x_range=None, title=title)
 
     x, y = get_timeseries(exposures, 'SEEING')
     seeing = plot_timeseries(x, y, 'SEEING', 'navy', x_range=airmass.x_range)
 
     x, y = get_timeseries(exposures, 'EXPTIME')
-    exptime = plot_timeseries(x, y, 'EXPTIME', 'green', x_range=airmass.x_range)
+    exptime = plot_timeseries(x, y, 'EXPTIME', 'darkorange', x_range=airmass.x_range)
 
     #- Convert these to the components to include in the HTML
     timeseries_script, timeseries_div = components(bk.Column(airmass, seeing, exptime))
@@ -273,13 +301,21 @@ def makeplots(night, exposures, tiles, outdir):
     table_script, table_div = components(nightlytable)
     
     #adding in the skyplot components
-    skypathplot = get_skypathplot(exposures, tiles, night, width=600, height=300)
+    skypathplot = get_skypathplot(exposures, tiles, width=600, height=300)
     skypathplot_script, skypathplot_div = components(skypathplot)
     
     #adding in the components of the exposure types bar plot
     exptypecounts = get_exptype_counts(exposures, calibs, width=300, height=300)
     exptypecounts_script, exptypecounts_div = components(exptypecounts)
-        
+    
+    #- Get overlaid histograms for several variables
+    airmasshist = overlaid_hist(all_exposures, exposures, 'AIRMASS', 'green')
+    seeinghist = overlaid_hist(all_exposures, exposures, 'SEEING', 'navy')
+    transphist = overlaid_hist(all_exposures, exposures, 'TRANSP', 'purple')
+    
+    overlaidhists_script, overlaidhists_div = components(bk.Column(airmasshist, seeinghist, transphist))
+    
+    
     #----
     #- Template HTML for this page
     
@@ -367,7 +403,11 @@ def makeplots(night, exposures, tiles, outdir):
                     
                     <div class="flex-container">
                         <div>{{ timeseries_script }} {{ timeseries_div }}</div>
-                        <div> NIGHT VS. SUMMARY HISTOGRAMS HERE </div>
+                        <div>{{ overlaidhists_script }} {{ overlaidhists_div }}</div>
+                    </div> 
+
+                    <div class="flex-container">
+                        <div>{{ overlaidhists_script }} {{ overlaidhists_div }}</div>
                     </div> 
 
                     <div class="flex-container">{{ table_script }}{{ table_div }}</div>     
@@ -393,42 +433,3 @@ def makeplots(night, exposures, tiles, outdir):
         fx.write(html)
 
     print('Wrote {}'.format(outfile))
-
-# def get_skypathplot(exposures, tiles, night, width=600, height=300):
-#     """
-#     TODO: briefly summarize this function
-#
-#     ARGS:
-#         exposures : Table of exposures with columns ...
-#         tiles: Table of tile locations with columns ...
-#         night : String representing a single value in the NIGHT column of the EXPOSURES table
-#
-#     Options:
-#         height, width = height and width of the graph in pixels
-#
-#     Returns a bokeh figure object
-#     """
-#
-#     #plot options
-#     night_name = exposures['NIGHT'][0]
-#     string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
-#
-#     fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
-#     fig.yaxis.axis_label = 'Declination'
-#     fig.xaxis.axis_label = 'Right Ascension'
-#
-#     #plots of all tiles
-#     unobs = fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
-#
-#     #plots tiles observed on NIGHT
-#     obs = fig.circle('RA', 'DEC', color='blue', size=3, legend='Observed', source=src)
-#     fig.line(src.data['RA'], src.data['DEC'], color='black')
-#
-#     #adds hover tool
-#     TOOLTIPS = [("(RA, DEC)", "($x, $y)"), ("EXPID", "@EXPID")]
-#     obs_hover = HoverTool(renderers = [obs], tooltips=TOOLTIPS)
-#     fig.add_tools(obs_hover)
-#
-#     #shows plot
-#     return fig
-
