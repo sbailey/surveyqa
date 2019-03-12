@@ -109,6 +109,54 @@ def get_nightlytable(exposures):
     return nightly_table
 
 
+def get_skypathplot(exposures, tiles, night, width=600, height=300):
+    """
+    Generate a plot which maps the location of tiles observed on NIGHT
+    
+    ARGS:
+        exposures : Table of exposures with columns ...
+        tiles: Table of tile locations with columns ...
+        night : String representing a single value in the NIGHT column of the EXPOSURES table
+        
+    Options:
+        height, width = height and width of the graph in pixels
+        
+    Returns a bokeh figure object
+    """
+    exposures = find_night(exposures, night)
+    
+    #merges tiles data for all exposures on a single night N
+    tiles_and_exps = join(exposures, tiles['STAR_DENSITY', 'EXPOSEFAC', 'OBSCONDITIONS', 'TILEID'], keys='TILEID')
+    
+    #converts data format into ColumnDataSource
+    src = ColumnDataSource(data={'RA':np.array(tiles_and_exps['RA']), 
+                                 'DEC':np.array(tiles_and_exps['DEC']), 
+                                 'EXPID':np.array(tiles_and_exps['EXPID'])})
+    
+    #plot options
+    night_name = exposures['NIGHT'][0]
+    string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
+
+    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
+    fig.yaxis.axis_label = 'Declination'
+    fig.xaxis.axis_label = 'Right Ascension'
+
+    #plots of all tiles
+    unobs = fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
+
+    #plots tiles observed on NIGHT
+    obs = fig.circle('RA', 'DEC', color='blue', size=3, legend='Observed', source=src)
+    fig.line(src.data['RA'], src.data['DEC'], color='black')
+
+    #adds hover tool
+    TOOLTIPS = [("(RA, DEC)", "($x, $y)"), ("EXPID", "@EXPID")]
+    obs_hover = HoverTool(renderers = [obs], tooltips=TOOLTIPS)
+    fig.add_tools(obs_hover)
+
+    #shows plot
+    return fig
+
+
 def makeplots(night, exposures, tiles, outdir):
     '''
     Generates summary plots for the DESI survey QA
@@ -119,25 +167,26 @@ def makeplots(night, exposures, tiles, outdir):
         tiles: Table of tile locations with columns ...
         outdir: directory to write the files
 
-        Writes outdir/night-*.html
-        '''
-
+    Writes outdir/night-*.html
+    '''
+    
     #- Filter exposures to just this night and adds columns DATETIME and MJD_hour
-    #- Note: this replaces local variable but does not modify original input (good)
     exposures = find_night(exposures, night)
-    calibs = exposures[exposures['PROGRAM']=='CALIB']
-    science = exposures[exposures['FLAVOR']=='science']
+    
+    #- Separate calibration exposures
+    calibs = exposures[exposures['PROGRAM'] == 'CALIB']
+    exposures = exposures[exposures['PROGRAM'] != 'CALIB']
 
+    title='Airmass, Seeing, Exptime vs. Time for {}/{}/{}'.format(night[4:6], night[6:], night[:4])
     #- Get timeseries plots for several variables
     x, y = get_timeseries(exposures, tiles, 'AIRMASS')
-    airmass = plot_timeseries(x, y, 'AIRMASS', 'darkorange')
+    airmass = plot_timeseries(x, y, 'AIRMASS', 'darkorange', x_range=None, title=title)
 
     x, y = get_timeseries(exposures, tiles, 'SEEING')
     seeing = plot_timeseries(x, y, 'SEEING', 'navy', x_range=airmass.x_range)
 
     x, y = get_timeseries(exposures, tiles, 'EXPTIME')
     exptime = plot_timeseries(x, y, 'EXPTIME', 'green', x_range=airmass.x_range)
-
 
     #- Convert these to the components to include in the HTML
     timeseries_script, timeseries_div = components(bk.Column(airmass, seeing, exptime))
@@ -150,10 +199,10 @@ def makeplots(night, exposures, tiles, outdir):
     skypathplot = get_skypathplot(exposures, tiles, night)
     skypathplot_script, skypathplot_div = components(skypathplot)
     
-    #getting components for totals bar graph
-    exptype_count = get_exptype_counts(science, calibs)
-    exptype_script, exptype_div = components(exptype_count)
-    
+    #adding in the components of the exposure types bar plot
+    exptypecounts = get_exptype_counts(exposures, calibs)
+    exptypecounts_script, exptypecounts_div = components(exptypecounts)
+        
     #----
     #- Template HTML for this page
     
@@ -236,7 +285,7 @@ def makeplots(night, exposures, tiles, outdir):
                 <div class="column middle">
                     <div class="flex-container">
                         <div>{{ skypathplot_script }} {{ skypathplot_div}}</div>
-                        <div>{{ exptype_script }} {{ exptype_div }}</div>
+                        <div>{{ exptypecounts_script }} {{ exptypecounts_div }}</div>
                     </div>    
                     
                     <div class="flex-container">
@@ -267,11 +316,10 @@ def makeplots(night, exposures, tiles, outdir):
         fx.write(html)
 
     print('Wrote {}'.format(outfile))
-    
-    
+
 def get_skypathplot(exposures, tiles, night, width=600, height=300):
     """
-    Generate a plot which maps the location of tiles observed on NIGHT
+    TODO: briefly summarize this function
     
     ARGS:
         exposures : Table of exposures with columns ...
@@ -283,16 +331,7 @@ def get_skypathplot(exposures, tiles, night, width=600, height=300):
         
     Returns a bokeh figure object
     """
-    exposures = find_night(exposures, night)
-    
-    #merges tiles data for all exposures on a single night N
-    tiles_and_exps = join(exposures, tiles['STAR_DENSITY', 'EXPOSEFAC', 'OBSCONDITIONS', 'TILEID'], keys='TILEID')
-    
-    #converts data format into ColumnDataSource
-    src = ColumnDataSource(data={'RA':np.array(tiles_and_exps['RA']), 
-                                 'DEC':np.array(tiles_and_exps['DEC']), 
-                                 'EXPID':np.array(tiles_and_exps['EXPID'])})
-    
+
     #plot options
     night_name = exposures['NIGHT'][0]
     string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
@@ -333,7 +372,6 @@ def get_exptype_counts(exposures, calibs):
     arcs = len(calibs[calibs['FLAVOR'] == 'arc'])
     flats = len(calibs[calibs['FLAVOR'] == 'flat'])
     zeroes = len(calibs[calibs['FLAVOR'] == 'zero'])
-    
     
     types = [('calib', 'ZERO'), ('calib', 'FLAT'), ('calib', 'ARC'), 
             ('science', 'BRIGHT'), ('science', 'GRAY'), ('science', 'DARK')]
