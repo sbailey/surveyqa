@@ -234,10 +234,6 @@ def makeplots(night, exposures, tiles, outdir):
     skypathplot = get_skypathplot(exposures, tiles, width=600, height=300)
     skypathplot_script, skypathplot_div = components(skypathplot)
     
-    #adding in the components of the exposure types bar plot
-    exptypecounts = get_exptype_counts(exposures, calibs, width=300, height=300)
-    exptypecounts_script, exptypecounts_div = components(exptypecounts)
-        
     
     #----
     #- Template HTML for this page
