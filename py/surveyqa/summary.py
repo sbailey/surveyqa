@@ -395,6 +395,25 @@ def get_exposeTimes_hist(exposures, width=600, height=400):
     fig.legend.click_policy="hide"
     return fig
 
+def get_moonplot(exposures, width=500, height=300):
+    p = bk.figure(plot_width=width, plot_height=height, x_axis_label = "MOONFRAC", y_axis_label = "MOONALT")
+
+    keep = exposures['PROGRAM'] != 'CALIB'
+    exposures_nocalib = exposures[keep]
+    color_mapper = LinearColorMapper(palette="Magma256", low=np.min(exposures_nocalib["MOONSEP"]), high=np.max(exposures_nocalib["MOONSEP"]))
+
+    source = ColumnDataSource(data=dict(
+            MOONFRAC = exposures_nocalib["MOONFRAC"],
+            MOONALT = exposures_nocalib["MOONALT"],
+            MOONSEP = exposures_nocalib["MOONSEP"]
+        ))
+
+    color_bar = ColorBar(color_mapper=color_mapper, label_standoff=12, location=(0,0), title='MOONSEP')
+    p.add_layout(color_bar, 'right')
+
+    p.circle("MOONFRAC", "MOONALT", color=transform('MOONSEP', color_mapper), alpha=0.5, source=source)
+    return p
+
 def makeplots(exposures, tiles, outdir):
     '''
     Generates summary plots for the DESI survey QA
@@ -435,7 +454,7 @@ def makeplots(exposures, tiles, outdir):
     body {
         margin: 0;
     }
-    
+
     .header {
         font-family: "Open Serif", Arial, Helvetica, sans-serif;
         background-color: #f1f1f1;
@@ -443,20 +462,20 @@ def makeplots(exposures, tiles, outdir):
         text-align: center;
         justify: space-around;
     }
- 
+
     .column {
         float: center;
         padding: 10px
     }
-    
+
     .column.side {
         width = 20%;
     }
-    
+
     .column.middle {
         width = 60%;
     }
-    
+
     .flex-container {
         display: flex;
         flex-direction: row;
@@ -464,7 +483,7 @@ def makeplots(exposures, tiles, outdir):
         justify-content: space-around;
         padding: 20px;
     }
-    
+
     p.sansserif {
         font-family: "Open Serif", Helvetica, sans-serif;
     }
@@ -482,38 +501,39 @@ def makeplots(exposures, tiles, outdir):
 
     template += """
         <div class="flex-container">
-            <div class="column side"></div>          
+            <div class="column side"></div>
             <div class="column middle">
                 <div class="header">
                     <p class="sansserif">Progress Graphs</p>
-                </div> 
-                
+                </div>
+
                 <div class="flex-container">
                     <div>{{ skyplot_script }} {{ skyplot_div }}</div>
                     <div>{{ progress_script }} {{ progress_div }}</div>
                     <div>{{ progress_script_1 }} {{ progress_div_1 }}</div>
-                </div>    
-                
+                    <div>{{ moonplot_script }} {{ moonplot_div }}</div>
+                </div>
+
                 <div class="header">
                     <p class="sansserif">Histograms</p>
                 </div>
-                
+
                 <div class="flex-container">
                     <div>{{ airmass_script }} {{airmass_div }}</div>
                     <div>{{ seeing_script }} {{ seeing_div }}</div>
                     <div>{{ transp_hist_script }} {{ transp_hist_div }}</div>
                     <div>{{ exposePerTile_hist_script }} {{ exposePerTile_hist_div }}</div>
                     <div>{{ exptime_script }} {{ exptime_div }}</div>
-                </div> 
-                
+                </div>
+
                 <div class="header">
                     <p class="sansserif">Summary Table</p>
                 </div>
-                
+
                 <div class="flex-container">
                     {{ summarytable_script }}
                     {{ summarytable_div }}
-                </div>     
+                </div>
             </div>
             <div class="column side"></div>
         </div>
@@ -549,17 +569,21 @@ def makeplots(exposures, tiles, outdir):
     exptime_hist = get_exposeTimes_hist(exposures)
     exptime_script, exptime_div = components(exptime_hist)
 
+    moonplot = get_moonplot(exposures)
+    moonplot_script, moonplot_div = components(moonplot)
+
     #- Convert to a jinja2.Template object and render HTML
     html = jinja2.Template(template).render(
         skyplot_script=skyplot_script, skyplot_div=skyplot_div,
         progress_script=progress_script, progress_div=progress_div,
         progress_script_1=progress_script_1, progress_div_1=progress_div_1,
         summarytable_script=summarytable_script, summarytable_div=summarytable_div,
-        airmass_script=airmass_script, airmass_div=airmass_div, 
+        airmass_script=airmass_script, airmass_div=airmass_div,
         seeing_script=seeing_script, seeing_div=seeing_div,
         exptime_script=exptime_script, exptime_div=exptime_div,
         transp_hist_script=transp_hist_script, transp_hist_div=transp_hist_div,
         exposePerTile_hist_script=exposePerTile_hist_script, exposePerTile_hist_div=exposePerTile_hist_div,
+        moonplot_script=moonplot_script, moonplot_div=moonplot_div
         )
 
     outfile = os.path.join(outdir, 'summary.html')
