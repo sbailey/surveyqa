@@ -196,11 +196,11 @@ def makeplots(night, exposures, tiles, outdir):
     table_script, table_div = components(nightlytable)
     
     #adding in the skyplot components
-    skypathplot = get_skypathplot(exposures, tiles, night)
+    skypathplot = get_skypathplot(exposures, tiles, night, width=600, height=300)
     skypathplot_script, skypathplot_div = components(skypathplot)
     
     #adding in the components of the exposure types bar plot
-    exptypecounts = get_exptype_counts(exposures, calibs)
+    exptypecounts = get_exptype_counts(exposures, calibs, width=300, height=300)
     exptypecounts_script, exptypecounts_div = components(exptypecounts)
         
     #----
@@ -305,7 +305,7 @@ def makeplots(night, exposures, tiles, outdir):
     #- Convert to a jinja2.Template object and render HTML
     html = jinja2.Template(template).render(
         skypathplot_script=skypathplot_script, skypathplot_div=skypathplot_div,
-        exptype_script=exptype_script, exptype_div=exptype_div,
+        exptypecounts_script=exptypecounts_script, exptypecounts_div=exptypecounts_div,
         timeseries_script=timeseries_script, timeseries_div=timeseries_div,
         table_script=table_script, table_div=table_div,
         )
@@ -317,46 +317,46 @@ def makeplots(night, exposures, tiles, outdir):
 
     print('Wrote {}'.format(outfile))
 
-def get_skypathplot(exposures, tiles, night, width=600, height=300):
-    """
-    TODO: briefly summarize this function
-    
-    ARGS:
-        exposures : Table of exposures with columns ...
-        tiles: Table of tile locations with columns ...
-        night : String representing a single value in the NIGHT column of the EXPOSURES table
-        
-    Options:
-        height, width = height and width of the graph in pixels
-        
-    Returns a bokeh figure object
-    """
+# def get_skypathplot(exposures, tiles, night, width=600, height=300):
+#     """
+#     TODO: briefly summarize this function
+#
+#     ARGS:
+#         exposures : Table of exposures with columns ...
+#         tiles: Table of tile locations with columns ...
+#         night : String representing a single value in the NIGHT column of the EXPOSURES table
+#
+#     Options:
+#         height, width = height and width of the graph in pixels
+#
+#     Returns a bokeh figure object
+#     """
+#
+#     #plot options
+#     night_name = exposures['NIGHT'][0]
+#     string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
+#
+#     fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
+#     fig.yaxis.axis_label = 'Declination'
+#     fig.xaxis.axis_label = 'Right Ascension'
+#
+#     #plots of all tiles
+#     unobs = fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
+#
+#     #plots tiles observed on NIGHT
+#     obs = fig.circle('RA', 'DEC', color='blue', size=3, legend='Observed', source=src)
+#     fig.line(src.data['RA'], src.data['DEC'], color='black')
+#
+#     #adds hover tool
+#     TOOLTIPS = [("(RA, DEC)", "($x, $y)"), ("EXPID", "@EXPID")]
+#     obs_hover = HoverTool(renderers = [obs], tooltips=TOOLTIPS)
+#     fig.add_tools(obs_hover)
+#
+#     #shows plot
+#     return fig
 
-    #plot options
-    night_name = exposures['NIGHT'][0]
-    string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
 
-    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
-    fig.yaxis.axis_label = 'Declination'
-    fig.xaxis.axis_label = 'Right Ascension'
-
-    #plots of all tiles
-    unobs = fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
-
-    #plots tiles observed on NIGHT
-    obs = fig.circle('RA', 'DEC', color='blue', size=3, legend='Observed', source=src)
-    fig.line(src.data['RA'], src.data['DEC'], color='black')
-
-    #adds hover tool
-    TOOLTIPS = [("(RA, DEC)", "($x, $y)"), ("EXPID", "@EXPID")]
-    obs_hover = HoverTool(renderers = [obs], tooltips=TOOLTIPS)
-    fig.add_tools(obs_hover)
-
-    #shows plot
-    return fig
-
-
-def get_exptype_counts(exposures, calibs):
+def get_exptype_counts(exposures, calibs, width=300, height=300):
     """
     Generate a horizontal bar plot showing the counts for each type of exposure grouped 
     by whether they have FLAVOR='science' or PROGRAM='calib'
@@ -379,7 +379,8 @@ def get_exptype_counts(exposures, calibs):
     
     src = ColumnDataSource({'types':types, 'counts':counts})
     
-    p = bk.figure(y_range=FactorRange(*types), title='Exposure Type Counts', 
+    p = bk.figure(width=width, height=height,
+                  y_range=FactorRange(*types), title='Exposure Type Counts', 
                   toolbar_location=None)
     p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white',
            fill_color=factor_cmap('types', palette=Spectral6, factors=types), source=src)
