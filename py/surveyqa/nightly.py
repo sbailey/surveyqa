@@ -237,14 +237,7 @@ def makeplots(night, exposures, tiles, outdir):
     #adding in the components of the exposure types bar plot
     exptypecounts = get_exptype_counts(exposures, calibs, width=300, height=300)
     exptypecounts_script, exptypecounts_div = components(exptypecounts)
-    
-    #- Get overlaid histograms for several variables
-    airmasshist = overlaid_hist(all_exposures, exposures, 'AIRMASS', 'green')
-    seeinghist = overlaid_hist(all_exposures, exposures, 'SEEING', 'navy')
-    transphist = overlaid_hist(all_exposures, exposures, 'TRANSP', 'purple')
-    
-    overlaidhists_script, overlaidhists_div = components(bk.Column(airmasshist, seeinghist, transphist))
-    
+        
     
     #----
     #- Template HTML for this page
@@ -333,11 +326,6 @@ def makeplots(night, exposures, tiles, outdir):
                     
                     <div class="flex-container">
                         <div>{{ timeseries_script }} {{ timeseries_div }}</div>
-                        <div>{{ overlaidhists_script }} {{ overlaidhists_div }}</div>
-                    </div> 
-
-                    <div class="flex-container">
-                        <div>{{ overlaidhists_script }} {{ overlaidhists_div }}</div>
                     </div> 
 
                     <div class="flex-container">{{ table_script }}{{ table_div }}</div>     
