@@ -169,8 +169,11 @@ def makeplots(night, exposures, tiles, outdir):
 
     Writes outdir/night-*.html
     '''
-    #getting path for the previous and next night links
+    #getting path for the previous and next night links, first and last night links, link back to summary page
     [prev_str, next_str] = get_night_link(night, exposures)
+    first_str = get_night_link(exposures['NIGHT'][0], exposures)[0]
+    last_str = get_night_link(exposures['NIGHT'][-1], exposures)[1]
+    summary_str = "file://" + str(outdir) + "/summary.html"
     
     #- Filter exposures to just this night and adds columns DATETIME and MJD_hour
     exposures = find_night(exposures, night)
@@ -270,6 +273,30 @@ def makeplots(night, exposures, tiles, outdir):
     p.sansserif {
         font-family: "Open Serif", Helvetica, sans-serif;
     }
+    
+    ul {
+      list-style-type: none;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #333;
+    }
+
+    li {
+      float: left;
+    }
+
+    li a {
+      display: block;
+      color: white;
+      text-align: center;
+      padding: 14px 16px;
+      text-decoration: none;
+    }
+
+    li a:hover {
+      background-color: #111;
+    }
     </style>
     </head>
     """
@@ -282,34 +309,37 @@ def makeplots(night, exposures, tiles, outdir):
     """.format(night)
 
     template += """
+        <ul>
+          <li><a href={}>First</a></li>
+          <li><a href={}>Previous</a></li>
+          <li><a href={}>Summary Page</a></li>
+          <li><a href={}>Next</a></li>
+          <li><a href={}>Last</a></li>
+        </ul>             
+    """.format(first_str, prev_str, summary_str, next_str, last_str)
+    
+    template += """
         <div class="flex-container">
-                <div class="column side"></div>
-    """
-    template += """
-                    <a href={}>Previous</a> """.format(prev_str)
-    template += """
-                <div class="column middle">
-                    <div class="flex-container">
-                        <div>{{ skypathplot_script }} {{ skypathplot_div}}</div>
-                        <div>{{ exptypecounts_script }} {{ exptypecounts_div }}</div>
-                    </div>    
+            <div class="column side"></div>    
+            <div class="column middle">
+                <div class="flex-container">
+                    <div>{{ skypathplot_script }} {{ skypathplot_div}}</div>
+                    <div>{{ exptypecounts_script }} {{ exptypecounts_div }}</div>
+                </div>    
                     
-                    <div class="flex-container">
-                        <div>{{ timeseries_script }} {{ timeseries_div }}</div>
-                        <div> NIGHT VS. SUMMARY HISTOGRAMS HERE </div>
-                    </div> 
+                <div class="flex-container">
+                    <div>{{ timeseries_script }} {{ timeseries_div }}</div>
+                    <div> NIGHT VS. SUMMARY HISTOGRAMS HERE </div>
+                </div> 
 
-                    <div class="flex-container">{{ table_script }}{{ table_div }}</div>     
-                </div>
-    """
-    template += """
-                <div class="column side"></div>
-                    <a href={}>Next</a>
-            </div>
+                <div class="flex-container">{{ table_script }}{{ table_div }}</div>
+            </div>     
+            <div class="column side"></div>        
+        </div>          
     </body>
 
     </html>
-    """.format(next_str)
+    """
 
     #- Convert to a jinja2.Template object and render HTML
     html = jinja2.Template(template).render(
@@ -325,44 +355,6 @@ def makeplots(night, exposures, tiles, outdir):
         fx.write(html)
 
     print('Wrote {}'.format(outfile))
-
-# def get_skypathplot(exposures, tiles, night, width=600, height=300):
-#     """
-#     TODO: briefly summarize this function
-#
-#     ARGS:
-#         exposures : Table of exposures with columns ...
-#         tiles: Table of tile locations with columns ...
-#         night : String representing a single value in the NIGHT column of the EXPOSURES table
-#
-#     Options:
-#         height, width = height and width of the graph in pixels
-#
-#     Returns a bokeh figure object
-#     """
-#
-#     #plot options
-#     night_name = exposures['NIGHT'][0]
-#     string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
-#
-#     fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
-#     fig.yaxis.axis_label = 'Declination'
-#     fig.xaxis.axis_label = 'Right Ascension'
-#
-#     #plots of all tiles
-#     unobs = fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
-#
-#     #plots tiles observed on NIGHT
-#     obs = fig.circle('RA', 'DEC', color='blue', size=3, legend='Observed', source=src)
-#     fig.line(src.data['RA'], src.data['DEC'], color='black')
-#
-#     #adds hover tool
-#     TOOLTIPS = [("(RA, DEC)", "($x, $y)"), ("EXPID", "@EXPID")]
-#     obs_hover = HoverTool(renderers = [obs], tooltips=TOOLTIPS)
-#     fig.add_tools(obs_hover)
-#
-#     #shows plot
-#     return fig
 
 
 def get_exptype_counts(exposures, calibs, width=300, height=300):
