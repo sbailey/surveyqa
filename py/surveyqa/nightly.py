@@ -193,46 +193,40 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
 
 def get_exptype_counts(exposures, calibs, width=300, height=300):
     """
-    Generate a horizontal bar plot showing the counts for each type of exposure grouped 
-    by whether they have FLAVOR='science' or PROGRAM='calib'
-    
+    Generate a horizontal bar plot showing the counts for each type of
+    exposure grouped by whether they have FLAVOR='science' or PROGRAM='calib'
+
     ARGS:
         exposures : a table of exposures which only contain those with FLAVOR='science'
         calibs : a table of exposures which only contains those with PROGRAm='calibs'
-    
-    Options:
-        height, width = height and width of the graph in pixels
-
-    Returns a bokeh figure object
     """
-    #- Separate out the different exposure types
     darks = len(exposures[exposures['PROGRAM'] == 'DARK'])
     grays = len(exposures[exposures['PROGRAM'] == 'GRAY'])
     brights = len(exposures[exposures['PROGRAM'] == 'BRIGHTS'])
+
     arcs = len(calibs[calibs['FLAVOR'] == 'arc'])
     flats = len(calibs[calibs['FLAVOR'] == 'flat'])
     zeroes = len(calibs[calibs['FLAVOR'] == 'zero'])
-    
-    #- Create a ColumnDataSource of the different exposure types and group by flavor/program
-    types = [('calib', 'ZERO'), ('calib', 'FLAT'), ('calib', 'ARC'), 
+
+    types = [('calib', 'ZERO'), ('calib', 'FLAT'), ('calib', 'ARC'),
             ('science', 'BRIGHT'), ('science', 'GRAY'), ('science', 'DARK')]
     counts = np.array([zeroes, flats, arcs, brights, grays, darks])
+
     src = ColumnDataSource({'types':types, 'counts':counts})
-    
-    #- Generate the horizontal barplot
-    p = bk.figure(y_range=FactorRange(*types), title='Exposure Type Counts', 
-                  toolbar_location=None, width=width, height=height)
+
+    p = bk.figure(width=width, height=height,
+                  y_range=FactorRange(*types), title='Exposure Type Counts',
+                  toolbar_location=None)
     p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white',
            fill_color=factor_cmap('types', palette=Spectral6, factors=types), source=src)
-    
-    #- Add labels
-    labels = LabelSet(x='counts', y='types', text='counts', level='glyph', source=src, 
+
+
+    labels = LabelSet(x='counts', y='types', text='counts', level='glyph', source=src,
                       render_mode='canvas', x_offset=5, y_offset=-10, text_color='gray', text_font='sans-serif')
     p.add_layout(labels)
-    
-    #- Formatting
+
     p.ygrid.grid_line_color=None
-    
+
     return p
 
 
@@ -403,10 +397,6 @@ def makeplots(night, exposures, tiles, outdir):
                     
                     <div class="flex-container">
                         <div>{{ timeseries_script }} {{ timeseries_div }}</div>
-                        <div>{{ overlaidhists_script }} {{ overlaidhists_div }}</div>
-                    </div> 
-
-                    <div class="flex-container">
                         <div>{{ overlaidhists_script }} {{ overlaidhists_div }}</div>
                     </div> 
 
