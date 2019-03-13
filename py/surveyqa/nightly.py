@@ -169,6 +169,8 @@ def makeplots(night, exposures, tiles, outdir):
 
     Writes outdir/night-*.html
     '''
+    #getting path for the previous and next night links
+    [prev_str, next_str] = get_night_link(night, exposures)
     
     #- Filter exposures to just this night and adds columns DATETIME and MJD_hour
     exposures = find_night(exposures, night)
@@ -281,7 +283,11 @@ def makeplots(night, exposures, tiles, outdir):
 
     template += """
         <div class="flex-container">
-                <div class="column side"></div>          
+                <div class="column side"></div>
+    """
+    template += """
+                    <a href={}>Previous</a> """.format(prev_str)
+    template += """
                 <div class="column middle">
                     <div class="flex-container">
                         <div>{{ skypathplot_script }} {{ skypathplot_div}}</div>
@@ -295,12 +301,15 @@ def makeplots(night, exposures, tiles, outdir):
 
                     <div class="flex-container">{{ table_script }}{{ table_div }}</div>     
                 </div>
+    """
+    template += """
                 <div class="column side"></div>
+                    <a href={}>Next</a>
             </div>
     </body>
 
     </html>
-    """
+    """.format(next_str)
 
     #- Convert to a jinja2.Template object and render HTML
     html = jinja2.Template(template).render(
@@ -393,4 +402,32 @@ def get_exptype_counts(exposures, calibs, width=300, height=300):
     p.ygrid.grid_line_color=None
     
     return p
+
+def get_night_link(night, exposures):
+    '''Gets the href string for the previous night and the next night for a given nightly page. 
+        Input:
+            night: night value, string
+            exposures: Table with columns...
+        Output: [previous page href, next page href], elements are strings'''
+    unique_nights = list(np.unique(exposures['NIGHT'])) 
+    ind = unique_nights.index(night)
+    
+    if ind == 0:
+        prev_night = night
+        next_night = unique_nights[ind+1]
+    
+    if ind == (len(unique_nights)-1):
+        prev_night = unique_nights[ind-1]
+        next_night = night
+        
+    if ind != 0 and ind != (len(unique_nights)-1):
+        prev_night = unique_nights[ind-1]
+        next_night = unique_nights[ind+1]
+    
+    outdir = os.path.join(os.getcwd(), 'survey-qa')
+    os.makedirs(outdir, exist_ok=True)
+    prev_str = "file://" + str(outdir) + "/night-{}.html".format(prev_night)
+    next_str = "file://" + str(outdir) + "/night-{}.html".format(next_night)
+    
+    return [prev_str, next_str]
     
