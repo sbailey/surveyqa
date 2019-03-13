@@ -9,12 +9,13 @@ import jinja2
 from bokeh.embed import components
 import bokeh
 import bokeh.plotting as bk
-from bokeh.models import ColumnDataSource, LinearColorMapper, ColorBar, HoverTool
+from bokeh.models import ColumnDataSource, LinearColorMapper, ColorBar, HoverTool, HTMLTemplateFormatter
 from bokeh.transform import transform
 from astropy.time import Time, TimezoneInfo
 from astropy.table import Table, join
 from datetime import datetime, tzinfo
 import astropy.units as u
+
 
 def nights_first_observed(exposures, tiles):
     '''
@@ -127,8 +128,13 @@ def get_summarytable(exposures):
         calibs = calibs
     ))
 
+    #adds links to nightly pages to the nights column
+    outdir = os.path.join(os.getcwd(), 'survey-qa')
+    os.makedirs(outdir, exist_ok=True)
+    template_str = '<a href='+'"file://' + str(outdir) + '/night-<%= nights %>.html"' + ' target="_blank"><%= value%></a>'
+   
     columns = [
-        TableColumn(field='nights', title='NIGHT'),
+        TableColumn(field='nights', title='NIGHT', formatter=HTMLTemplateFormatter(template=template_str)),
         TableColumn(field='totals', title='Total Exposures'),
         TableColumn(field='brights', title='Bright Exposures'),
         TableColumn(field='grays', title='Gray Exposures'),
