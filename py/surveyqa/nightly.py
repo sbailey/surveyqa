@@ -5,6 +5,7 @@ Plots for daily DESI observing
 from __future__ import absolute_import, division, print_function
 import sys, os
 import numpy as np
+import bokeh as bk
 
 import jinja2
 from bokeh.embed import components
@@ -13,7 +14,7 @@ import bokeh.plotting as bk
 from bokeh.models import ColumnDataSource
 
 from astropy.time import Time
-from bokeh.models import HoverTool
+from bokeh.models import HoverTool, ColorBar
 from bokeh.layouts import gridplot
 from astropy.table import join
 from astropy.time import TimezoneInfo
@@ -22,60 +23,83 @@ from datetime import tzinfo
 from datetime import datetime
 from bokeh.models.glyphs import HBar
 from bokeh.models import LabelSet, FactorRange
-from bokeh.palettes import Spectral6
-from bokeh.transform import factor_cmap
+from bokeh.palettes import Spectral6, viridis
+from bokeh.transform import factor_cmap, factor_mark, linear_cmap
+from bokeh.models.widgets.tables import DataTable, TableColumn
+    
 
 def find_night(exposures, night):
     """
     Generates a subtable of exposures corresponding to data from a single night N and adds column TIME
     
     ARGS:
-        exposures : Table of exposures with columns
-        night : A string representing a single value in the NIGHT column of the EXPOSURES table
+        exposures : Table of exposures with columns...
+        night : String representing a single value in the NIGHT column of the EXPOSURES table
+    
+    Returns an astropy table object
     """
+    #- Filters by NIGHT
     exposures = exposures[exposures['NIGHT'] == night]
     
+    #- Creates DateTime objects in Arizona timezone
     mjds = np.array(exposures['MJD'])
     tzone = TimezoneInfo(utc_offset = -7*u.hour)
     times = [Time(mjd, format='mjd', scale='utc').to_datetime(timezone=tzone) for mjd in mjds]    
     
+    #- Adds times to table
     exposures['TIME'] = times
+    
     return exposures
 
 
-def get_timeseries(exposures, tiles, name):
-    '''
+def get_timeseries(exposures, name):
+    """
     Generates times and values arrays for column `name`
-    '''
+    
+    ARGS:
+        exposures : Table of exposures with columns...
+        name : String corresponding to a column in EXPOSURES
+    
+    Returns numpy array objects
+    """
     x = np.array(exposures['TIME'])
     y = np.array(exposures[name])
+    
     return x, y
 
 
-def plot_timeseries(times, values, name, color, x_range=None, title=None):
-    '''
+def plot_timeseries(times, values, name, color, x_range=None, title=None, width=400, height=150):
+    """
     Plots VALUES vs. TIMES
 
-    Args:
+    ARGS:
         times : array of times in hours
         values : array of values to plot
         name : string name of this timeseries
         color : color for plotted data points
         x_range : a range of x values to link multiple plots together
+    
+    Options:
+        height, width = height and width of the graph in pixels
+        x_range = x-axis range of the graph
+        title = graph title
 
-    Returns bokeh Figure object
-    '''
-    fig = bk.figure(width=400, height=150, toolbar_location=None, 
+    Returns bokeh figure object
+    """
+    fig = bk.figure(width=width, height=height, toolbar_location=None, 
                     x_axis_type='datetime', x_range=x_range, 
                     active_scroll='wheel_zoom', title=title)
     fig.line(times, values)
     fig.circle(times, values, line_color=color, fill_color='white', size=6, line_width=2)
+    
+    #- Formatting
     fig.ygrid.grid_line_color = None
     fig.xgrid.grid_line_color = None
     fig.outline_line_color = None
     fig.yaxis.axis_label = name
 
     return fig
+
 
 def get_nightlytable(exposures):
     '''
@@ -86,7 +110,6 @@ def get_nightlytable(exposures):
         
     Returns a bokeh DataTable object.
     '''
-    from bokeh.models.widgets.tables import DataTable, TableColumn
     
     source = ColumnDataSource(data=dict(
         expid = np.array(exposures['EXPID']),
@@ -109,31 +132,33 @@ def get_nightlytable(exposures):
     return nightly_table
 
 
-def get_skypathplot(exposures, tiles, night, width=600, height=300):
+def get_skypathplot(exposures, tiles, width=600, height=300):
     """
     Generate a plot which maps the location of tiles observed on NIGHT
     
     ARGS:
-        exposures : Table of exposures with columns ...
+        exposures : Table of exposures with columns specific to a single night
         tiles: Table of tile locations with columns ...
-        night : String representing a single value in the NIGHT column of the EXPOSURES table
-        
+    
     Options:
         height, width = height and width of the graph in pixels
         
     Returns a bokeh figure object
-    """
-    exposures = find_night(exposures, night)
-    
-    #merges tiles data for all exposures on a single night N
+    """    
+    #- Merges tiles data for all exposures on a single night N
     tiles_and_exps = join(exposures, tiles['STAR_DENSITY', 'EXPOSEFAC', 'OBSCONDITIONS', 'TILEID'], keys='TILEID')
     
-    #converts data format into ColumnDataSource
+    #- Create a linear range object for each element of TIME to use for color mapping
+    TIMES = range(len(tiles_and_exps['TIME']))
+
+    #- Converts data format into ColumnDataSource
     src = ColumnDataSource(data={'RA':np.array(tiles_and_exps['RA']), 
                                  'DEC':np.array(tiles_and_exps['DEC']), 
-                                 'EXPID':np.array(tiles_and_exps['EXPID'])})
+                                 'EXPID':np.array(tiles_and_exps['EXPID']),
+                                 'PROGRAM':np.array([str(n) for n in tiles_and_exps['PROGRAM']]),
+                                 'TIME':TIMES})
     
-    #plot options
+    #- Plot options
     night_name = exposures['NIGHT'][0]
     string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
 
@@ -141,20 +166,67 @@ def get_skypathplot(exposures, tiles, night, width=600, height=300):
     fig.yaxis.axis_label = 'Declination'
     fig.xaxis.axis_label = 'Right Ascension'
 
-    #plots of all tiles
+    #- Plots all tiles
     unobs = fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
+    
+    #- Shape-coding for program
+    EXPTYPES = ['DARK', 'GRAY', 'BRIGHT']
+    MARKERS = ['hex', 'square', 'triangle']
+    shapes = factor_mark(field_name='PROGRAM', markers=MARKERS, factors=EXPTYPES)
+    
+    #- Color-coding for time of night
+    mapper = linear_cmap(field_name='TIME', palette=viridis(len(TIMES)), low=min(TIMES), high=max(TIMES))
+    
+    #- Plots tiles observed on NIGHT
+    obs = fig.scatter('RA', 'DEC', size=8, fill_alpha=0.8, legend='PROGRAM', source=src, marker=shapes, color=mapper)
+    fig.line(src.data['RA'], src.data['DEC'], color='navy', alpha=0.4)
 
-    #plots tiles observed on NIGHT
-    obs = fig.circle('RA', 'DEC', color='blue', size=3, legend='Observed', source=src)
-    fig.line(src.data['RA'], src.data['DEC'], color='black')
-
-    #adds hover tool
+    #- Adds hover tool, color bar
     TOOLTIPS = [("(RA, DEC)", "($x, $y)"), ("EXPID", "@EXPID")]
     obs_hover = HoverTool(renderers = [obs], tooltips=TOOLTIPS)
+    colorbar = ColorBar(color_mapper=mapper['transform'], width=8,  location=(0,0))
+    fig.add_layout(colorbar, 'right')
     fig.add_tools(obs_hover)
 
-    #shows plot
     return fig
+
+def get_exptype_counts(exposures, calibs, width=300, height=300):
+    """
+    Generate a horizontal bar plot showing the counts for each type of
+    exposure grouped by whether they have FLAVOR='science' or PROGRAM='calib'
+
+    ARGS:
+        exposures : a table of exposures which only contain those with FLAVOR='science'
+        calibs : a table of exposures which only contains those with PROGRAm='calibs'
+    """
+    darks = len(exposures[exposures['PROGRAM'] == 'DARK'])
+    grays = len(exposures[exposures['PROGRAM'] == 'GRAY'])
+    brights = len(exposures[exposures['PROGRAM'] == 'BRIGHTS'])
+
+    arcs = len(calibs[calibs['FLAVOR'] == 'arc'])
+    flats = len(calibs[calibs['FLAVOR'] == 'flat'])
+    zeroes = len(calibs[calibs['FLAVOR'] == 'zero'])
+
+    types = [('calib', 'ZERO'), ('calib', 'FLAT'), ('calib', 'ARC'),
+            ('science', 'BRIGHT'), ('science', 'GRAY'), ('science', 'DARK')]
+    counts = np.array([zeroes, flats, arcs, brights, grays, darks])
+
+    src = ColumnDataSource({'types':types, 'counts':counts})
+
+    p = bk.figure(width=width, height=height,
+                  y_range=FactorRange(*types), title='Exposure Type Counts',
+                  toolbar_location=None)
+    p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white',
+           fill_color=factor_cmap('types', palette=Spectral6, factors=types), source=src)
+
+
+    labels = LabelSet(x='counts', y='types', text='counts', level='glyph', source=src,
+                      render_mode='canvas', x_offset=5, y_offset=-10, text_color='gray', text_font='sans-serif')
+    p.add_layout(labels)
+
+    p.ygrid.grid_line_color=None
+
+    return p
 
 
 def makeplots(night, exposures, tiles, outdir):
@@ -169,29 +241,35 @@ def makeplots(night, exposures, tiles, outdir):
 
     Writes outdir/night-*.html
     '''
+<<<<<<< HEAD
     #getting path for the previous and next night links, first and last night links, link back to summary page
+=======
+    
+    #getting path for the previous and next night links
+>>>>>>> 2740d584a08dd6f2e9054ea0c4833525bd611a9e
     [prev_str, next_str] = get_night_link(night, exposures)
     first_str = get_night_link(exposures['NIGHT'][0], exposures)[0]
     last_str = get_night_link(exposures['NIGHT'][-1], exposures)[1]
     summary_str = "file://" + str(outdir) + "/summary.html"
     
-    #- Filter exposures to just this night and adds columns DATETIME and MJD_hour
-    exposures = find_night(exposures, night)
-    
     #- Separate calibration exposures
-    calibs = exposures[exposures['PROGRAM'] == 'CALIB']
-    exposures = exposures[exposures['PROGRAM'] != 'CALIB']
+    all_exposures = exposures[exposures['PROGRAM'] != 'CALIB']
+    all_calibs = exposures[exposures['PROGRAM'] == 'CALIB']
 
+    #- Filter exposures to just this night and adds columns DATETIME and MJD_hour
+    exposures = find_night(all_exposures, night)
+    calibs = find_night(all_calibs, night)
+    
     title='Airmass, Seeing, Exptime vs. Time for {}/{}/{}'.format(night[4:6], night[6:], night[:4])
     #- Get timeseries plots for several variables
-    x, y = get_timeseries(exposures, tiles, 'AIRMASS')
-    airmass = plot_timeseries(x, y, 'AIRMASS', 'darkorange', x_range=None, title=title)
+    x, y = get_timeseries(exposures, 'AIRMASS')
+    airmass = plot_timeseries(x, y, 'AIRMASS', 'green', x_range=None, title=title)
 
-    x, y = get_timeseries(exposures, tiles, 'SEEING')
+    x, y = get_timeseries(exposures, 'SEEING')
     seeing = plot_timeseries(x, y, 'SEEING', 'navy', x_range=airmass.x_range)
 
-    x, y = get_timeseries(exposures, tiles, 'EXPTIME')
-    exptime = plot_timeseries(x, y, 'EXPTIME', 'green', x_range=airmass.x_range)
+    x, y = get_timeseries(exposures, 'EXPTIME')
+    exptime = plot_timeseries(x, y, 'EXPTIME', 'darkorange', x_range=airmass.x_range)
 
     #- Convert these to the components to include in the HTML
     timeseries_script, timeseries_div = components(bk.Column(airmass, seeing, exptime))
@@ -201,13 +279,13 @@ def makeplots(night, exposures, tiles, outdir):
     table_script, table_div = components(nightlytable)
     
     #adding in the skyplot components
-    skypathplot = get_skypathplot(exposures, tiles, night, width=600, height=300)
+    skypathplot = get_skypathplot(exposures, tiles, width=600, height=300)
     skypathplot_script, skypathplot_div = components(skypathplot)
     
     #adding in the components of the exposure types bar plot
     exptypecounts = get_exptype_counts(exposures, calibs, width=300, height=300)
     exptypecounts_script, exptypecounts_div = components(exptypecounts)
-        
+    
     #----
     #- Template HTML for this page
     
@@ -327,6 +405,7 @@ def makeplots(night, exposures, tiles, outdir):
                     <div>{{ exptypecounts_script }} {{ exptypecounts_div }}</div>
                 </div>    
                     
+<<<<<<< HEAD
                 <div class="flex-container">
                     <div>{{ timeseries_script }} {{ timeseries_div }}</div>
                     <div> NIGHT VS. SUMMARY HISTOGRAMS HERE </div>
@@ -336,6 +415,19 @@ def makeplots(night, exposures, tiles, outdir):
             </div>     
             <div class="column side"></div>        
         </div>          
+=======
+                    <div class="flex-container">
+                        <div>{{ timeseries_script }} {{ timeseries_div }}</div>
+                    </div> 
+
+                    <div class="flex-container">{{ table_script }}{{ table_div }}</div>     
+                </div>
+    """
+    template += """
+                <div class="column side"></div>
+                    <a href={}>Next</a>
+            </div>
+>>>>>>> 2740d584a08dd6f2e9054ea0c4833525bd611a9e
     </body>
 
     </html>
@@ -356,7 +448,10 @@ def makeplots(night, exposures, tiles, outdir):
 
     print('Wrote {}'.format(outfile))
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 2740d584a08dd6f2e9054ea0c4833525bd611a9e
 def get_exptype_counts(exposures, calibs, width=300, height=300):
     """
     Generate a horizontal bar plot showing the counts for each type of exposure grouped 
@@ -422,4 +517,3 @@ def get_night_link(night, exposures):
     next_str = "file://" + str(outdir) + "/night-{}.html".format(next_night)
     
     return [prev_str, next_str]
-    
