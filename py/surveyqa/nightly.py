@@ -307,6 +307,7 @@ def makeplots(night, exposures, tiles, outdir):
     seeinghist = overlaid_hist(all_exposures, exposures, 'SEEING', 'navy')
     transphist = overlaid_hist(all_exposures, exposures, 'TRANSP', 'purple')
     
+    #adding in the components of the overlaid histograms
     overlaidhists_script, overlaidhists_div = components(bk.Column(airmasshist, seeinghist, transphist))
     
     
