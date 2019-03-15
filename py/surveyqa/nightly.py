@@ -246,7 +246,7 @@ def makeplots(night, exposures, tiles, outdir):
     [prev_str, next_str] = get_night_link(night, exposures)
     first_str = get_night_link(exposures['NIGHT'][0], exposures)[0]
     last_str = get_night_link(exposures['NIGHT'][-1], exposures)[1]
-    summary_str = "file://" + str(outdir) + "/summary.html"
+    summary_str = "summary.html"
     
     #- Separate calibration exposures
     all_exposures = exposures[exposures['PROGRAM'] != 'CALIB']
@@ -489,9 +489,7 @@ def get_night_link(night, exposures):
         prev_night = unique_nights[ind-1]
         next_night = unique_nights[ind+1]
     
-    outdir = os.path.join(os.getcwd(), 'survey-qa')
-    os.makedirs(outdir, exist_ok=True)
-    prev_str = "file://" + str(outdir) + "/night-{}.html".format(prev_night)
-    next_str = "file://" + str(outdir) + "/night-{}.html".format(next_night)
+    prev_str = "night-{}.html".format(prev_night)
+    next_str = "night-{}.html".format(next_night)
     
     return [prev_str, next_str]
