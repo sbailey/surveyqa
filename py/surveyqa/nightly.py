@@ -230,7 +230,7 @@ def get_exptype_counts(exposures, calibs, width=300, height=300):
     return p
 
 
-def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, height=300):
+def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, height=150):
     """
     Generates an overlaid histogram for a single attribute comparing the distribution 
     for all of the exposures vs. those from just one night
@@ -248,10 +248,10 @@ def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, h
     hist_all, edges_all = np.histogram(np.array(all_exposures[attribute]), density=True, bins=50)
     hist_night, edges_night = np.histogram(np.array(night_exposures[attribute]), density=True, bins=50)
 
-    fig = bk.figure(plot_width=width, plot_height=height, title = attribute + " Histogram",
+    fig = bk.figure(plot_width=width, plot_height=height, # title = attribute + " Histogram",
                     x_axis_label = attribute, y_axis_label = "Distribution")
-    fig.quad(top=hist_all, bottom=0, left=edges_all[:-1], right=edges_all[1:], fill_color=color, alpha=0.6)
-    fig.quad(top=hist_night, bottom=0, left=edges_night[:-1], right=edges_night[1:], fill_color=color, alpha=0.2)
+    fig.quad(top=hist_all, bottom=0, left=edges_all[:-1], right=edges_all[1:], fill_color=color, alpha=0.2)
+    fig.quad(top=hist_night, bottom=0, left=edges_night[:-1], right=edges_night[1:], fill_color=color, alpha=0.6)
     
     return fig
 
@@ -415,6 +415,7 @@ def makeplots(night, exposures, tiles, outdir):
         skypathplot_script=skypathplot_script, skypathplot_div=skypathplot_div,
         exptypecounts_script=exptypecounts_script, exptypecounts_div=exptypecounts_div,
         timeseries_script=timeseries_script, timeseries_div=timeseries_div,
+        overlaidhists_script=overlaidhists_script, overlaidhists_div=overlaidhists_div,
         table_script=table_script, table_div=table_div,
         )
 
