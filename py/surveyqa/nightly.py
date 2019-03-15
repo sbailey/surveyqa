@@ -190,6 +190,7 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
 
     return fig
 
+
 def get_exptype_counts(exposures, calibs, width=300, height=300):
     """
     Generate a horizontal bar plot showing the counts for each type of
@@ -227,6 +228,32 @@ def get_exptype_counts(exposures, calibs, width=300, height=300):
     p.ygrid.grid_line_color=None
 
     return p
+
+
+def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, height=150):
+    """
+    Generates an overlaid histogram for a single attribute comparing the distribution 
+    for all of the exposures vs. those from just one night
+    
+    ARGS:
+        all_exposures : a table of all the science exposures
+        night_exposures : a table of all the science exposures for a single night
+        attribute : a string name of a column in the exposures tables
+        color : color of histogram
+    Options:
+        height, width = height and width of the graph in pixels
+    
+    Returns a bokeh figure object
+    """
+    hist_all, edges_all = np.histogram(np.array(all_exposures[attribute]), density=True, bins=50)
+    hist_night, edges_night = np.histogram(np.array(night_exposures[attribute]), density=True, bins=50)
+
+    fig = bk.figure(plot_width=width, plot_height=height, # title = attribute + " Histogram",
+                    x_axis_label = attribute, y_axis_label = "Distribution")
+    fig.quad(top=hist_all, bottom=0, left=edges_all[:-1], right=edges_all[1:], fill_color=color, alpha=0.2)
+    fig.quad(top=hist_night, bottom=0, left=edges_night[:-1], right=edges_night[1:], fill_color=color, alpha=0.6)
+    
+    return fig
 
 
 def makeplots(night, exposures, tiles, outdir):
@@ -281,6 +308,15 @@ def makeplots(night, exposures, tiles, outdir):
     #adding in the components of the exposure types bar plot
     exptypecounts = get_exptype_counts(exposures, calibs, width=300, height=300)
     exptypecounts_script, exptypecounts_div = components(exptypecounts)
+    
+    #- Get overlaid histograms for several variables
+    airmasshist = overlaid_hist(all_exposures, exposures, 'AIRMASS', 'green')
+    seeinghist = overlaid_hist(all_exposures, exposures, 'SEEING', 'navy')
+    transphist = overlaid_hist(all_exposures, exposures, 'TRANSP', 'purple')
+    
+    #adding in the components of the overlaid histograms
+    overlaidhists_script, overlaidhists_div = components(bk.Column(airmasshist, seeinghist, transphist))
+    
     
     #----
     #- Template HTML for this page
@@ -394,22 +430,22 @@ def makeplots(night, exposures, tiles, outdir):
     
     template += """
         <div class="flex-container">
-            <div class="column side"></div>   
-            <div class="column middle">
-                <div class="flex-container">
-                    <div>{{ skypathplot_script }} {{ skypathplot_div}}</div>
-                    <div>{{ exptypecounts_script }} {{ exptypecounts_div }}</div>
-                </div>    
-                
-                <div class="flex-container">
-                    <div>{{ timeseries_script }} {{ timeseries_div }}</div>
-                    <div> NIGHT VS. SUMMARY HISTOGRAMS HERE </div>
-                </div> 
+                <div class="column side"></div>          
+                <div class="column middle">
+                    <div class="flex-container">
+                        <div>{{ skypathplot_script }} {{ skypathplot_div}}</div>
+                        <div>{{ exptypecounts_script }} {{ exptypecounts_div }}</div>
+                    </div>    
+                    
+                    <div class="flex-container">
+                        <div>{{ timeseries_script }} {{ timeseries_div }}</div>
+                        <div>{{ overlaidhists_script }} {{ overlaidhists_div }}</div>
+                    </div> 
 
-                <div class="flex-container">{{ table_script }}{{ table_div }}</div>
-            </div>     
-            <div class="column side"></div>        
-        </div>          
+                    <div class="flex-container">{{ table_script }}{{ table_div }}</div>     
+                </div>
+                <div class="column side"></div>
+            </div>
     </body>
 
     </html>
@@ -420,6 +456,7 @@ def makeplots(night, exposures, tiles, outdir):
         skypathplot_script=skypathplot_script, skypathplot_div=skypathplot_div,
         exptypecounts_script=exptypecounts_script, exptypecounts_div=exptypecounts_div,
         timeseries_script=timeseries_script, timeseries_div=timeseries_div,
+        overlaidhists_script=overlaidhists_script, overlaidhists_div=overlaidhists_div,
         table_script=table_script, table_div=table_div,
         )
 
