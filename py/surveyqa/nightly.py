@@ -147,6 +147,7 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
     """    
     #- Merges tiles data for all exposures on a single night N
     tiles_and_exps = join(exposures, tiles['STAR_DENSITY', 'EXPOSEFAC', 'OBSCONDITIONS', 'TILEID'], keys='TILEID')
+    tiles_and_exps.sort('TIME')
     
     #- Create a linear range object for each element of TIME to use for color mapping
     TIMES = range(len(tiles_and_exps['TIME']))
@@ -160,7 +161,7 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
     
     #- Plot options
     night_name = exposures['NIGHT'][0]
-    string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
+    string_date = night_name[4:6] + "-" + night_name[6:] + "-" + night_name[:4]
 
     fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
     fig.yaxis.axis_label = 'Declination'
@@ -222,7 +223,8 @@ def get_exptype_counts(exposures, calibs, width=300, height=300):
 
 
     labels = LabelSet(x='counts', y='types', text='counts', level='glyph', source=src,
-                      render_mode='canvas', x_offset=5, y_offset=-10, text_color='gray', text_font='sans-serif')
+                      render_mode='canvas', x_offset=5, y_offset=-7,
+                      text_color='gray', text_font='tahoma', text_font_size='8pt')
     p.add_layout(labels)
 
     p.ygrid.grid_line_color=None
