@@ -241,12 +241,8 @@ def makeplots(night, exposures, tiles, outdir):
 
     Writes outdir/night-*.html
     '''
-<<<<<<< HEAD
-    #getting path for the previous and next night links, first and last night links, link back to summary page
-=======
     
-    #getting path for the previous and next night links
->>>>>>> 2740d584a08dd6f2e9054ea0c4833525bd611a9e
+    #getting path for the previous and next night links, first and last night links, link back to summary page
     [prev_str, next_str] = get_night_link(night, exposures)
     first_str = get_night_link(exposures['NIGHT'][0], exposures)[0]
     last_str = get_night_link(exposures['NIGHT'][-1], exposures)[1]
@@ -398,14 +394,13 @@ def makeplots(night, exposures, tiles, outdir):
     
     template += """
         <div class="flex-container">
-            <div class="column side"></div>    
+            <div class="column side"></div>   
             <div class="column middle">
                 <div class="flex-container">
                     <div>{{ skypathplot_script }} {{ skypathplot_div}}</div>
                     <div>{{ exptypecounts_script }} {{ exptypecounts_div }}</div>
                 </div>    
-                    
-<<<<<<< HEAD
+                
                 <div class="flex-container">
                     <div>{{ timeseries_script }} {{ timeseries_div }}</div>
                     <div> NIGHT VS. SUMMARY HISTOGRAMS HERE </div>
@@ -415,19 +410,6 @@ def makeplots(night, exposures, tiles, outdir):
             </div>     
             <div class="column side"></div>        
         </div>          
-=======
-                    <div class="flex-container">
-                        <div>{{ timeseries_script }} {{ timeseries_div }}</div>
-                    </div> 
-
-                    <div class="flex-container">{{ table_script }}{{ table_div }}</div>     
-                </div>
-    """
-    template += """
-                <div class="column side"></div>
-                    <a href={}>Next</a>
-            </div>
->>>>>>> 2740d584a08dd6f2e9054ea0c4833525bd611a9e
     </body>
 
     </html>
@@ -448,10 +430,6 @@ def makeplots(night, exposures, tiles, outdir):
 
     print('Wrote {}'.format(outfile))
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 2740d584a08dd6f2e9054ea0c4833525bd611a9e
 def get_exptype_counts(exposures, calibs, width=300, height=300):
     """
     Generate a horizontal bar plot showing the counts for each type of exposure grouped 
