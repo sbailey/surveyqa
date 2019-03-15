@@ -141,6 +141,15 @@ def get_summarytable(exposures):
     return summary_table
 
 def nights_last_observed(exposures):
+    '''
+    Generates a table of the last exposure for every unique TILEID.
+    Mainly serves as a helper function for get_surveyprogress()
+
+    Args:
+        exposures: Table of exposures
+
+    Returns Table object
+    '''
     def last(arr):
         return arr[len(arr)-1]
     return exposures.group_by("TILEID").groups.aggregate(last)
@@ -150,8 +159,8 @@ def get_surveyprogress(exposures, tiles, width=300, height=300):
     Generates a plot of survey progress vs. time
 
     Args:
-        exposures: Table of exposures with columns ...
-        tiles: Table of tile locations with columns ...
+        exposures: Table of exposures with columns "PROGRAM", "TILEID", "MJD"
+        tiles: Table of tile locations with columns "TILEID", "EXPOSEFAC", "PROGRAM"
 
     Options:
         width, height: plot width and height in pixels
@@ -244,8 +253,8 @@ def get_surveyTileprogress(exposures, tiles, width=300, height=300):
     Generates a plot of survey progress vs. time
 
     Args:
-        exposures: Table of exposures with columns ...
-        tiles: Table of tile locations with columns ...
+        exposures: Table of exposures with columns "PROGRAM", "MJD", "TILEID"
+        tiles: Table of tile locations with columns "TILEID", "PROGRAM"
 
     Options:
         width, height: plot width and height in pixels
@@ -350,6 +359,19 @@ def get_surveyTileprogress(exposures, tiles, width=300, height=300):
     return fig
 
 def get_hist(exposures, attribute, color, width=300, height=300):
+    '''
+    Generates a histogram of the attribute provided for the given exposures table
+
+    Args:
+        exposures: Table of exposures with columns "PROGRAM" and attribute
+        attribute: String; must be the label of a column in exposures
+        color: String; color of the histogram
+
+    Options:
+        width, height: plot width and height in pixels
+
+    Returns bokeh Figure object
+    '''
     keep = exposures['PROGRAM'] != 'CALIB'
     exposures_nocalib = exposures[keep]
 
@@ -361,6 +383,19 @@ def get_hist(exposures, attribute, color, width=300, height=300):
     return fig_0
 
 def get_exposuresPerTile_hist(exposures, color, width=300, height=300):
+    '''
+    Generates a histogram of the number of exposures per tile for the given
+    exposures table
+
+    Args:
+        exposures: Table of exposures with column "TILEID"
+        color: String; color of the histogram
+
+    Options:
+        width, height: plot width and height in pixels
+
+    Returns bokeh Figure object
+    '''
     keep = exposures['PROGRAM'] != 'CALIB'
     exposures_nocalib = exposures[keep]
 
@@ -377,6 +412,19 @@ def get_exposuresPerTile_hist(exposures, color, width=300, height=300):
     return fig_3
 
 def get_exposeTimes_hist(exposures, width=600, height=400):
+    '''
+    Generates three overlaid histogram of the exposure times for the given
+    exposures table. Each of the histograms correspond to different
+    PROGRAM type: DARK, GREY, BRIGHT
+
+    Args:
+        exposures: Table of exposures with columns "PROGRAM", "EXPTIME"
+
+    Options:
+        width, height: plot width and height in pixels
+
+    Returns bokeh Figure object
+    '''
     keep = exposures['PROGRAM'] != 'CALIB'
     exposures_nocalib = exposures[keep]
 
@@ -395,12 +443,25 @@ def get_exposeTimes_hist(exposures, width=600, height=400):
     fig.legend.click_policy="hide"
     return fig
 
-def get_moonplot(exposures, width=500, height=300):
-    p = bk.figure(plot_width=width, plot_height=height, x_axis_label = "MOONFRAC", y_axis_label = "MOONALT")
+def get_moonplot(exposures, width=300, height=300):
+    '''
+    Generates a scatter plot of MOONFRAC vs MOONALT. Each point is then colored
+    with a gradient corresponding to its MOONSEP.
+
+    Args:
+        exposures: Table of exposures with columns "MOONFRAC", "MOONALT", "MOONSEP"
+
+    Options:
+        width, height: plot width and height in pixels
+
+    Returns bokeh Figure object
+    '''
+    p = bk.figure(plot_width=width, plot_height=height, x_axis_label = "MOONFRAC",
+     y_axis_label = "MOONALT")
 
     keep = exposures['PROGRAM'] != 'CALIB'
     exposures_nocalib = exposures[keep]
-    color_mapper = LinearColorMapper(palette="Magma256", low=np.min(exposures_nocalib["MOONSEP"]), high=np.max(exposures_nocalib["MOONSEP"]))
+    color_mapper = LinearColorMapper(palette="Magma256", low=0, high=180)
 
     source = ColumnDataSource(data=dict(
             MOONFRAC = exposures_nocalib["MOONFRAC"],
@@ -410,6 +471,7 @@ def get_moonplot(exposures, width=500, height=300):
 
     color_bar = ColorBar(color_mapper=color_mapper, label_standoff=12, location=(0,0), title='MOONSEP')
     p.add_layout(color_bar, 'right')
+    p.title.text = 'MOONFRAC vs MOONALT, colored with MOONSEP'
 
     p.circle("MOONFRAC", "MOONALT", color=transform('MOONSEP', color_mapper), alpha=0.5, source=source)
     return p
@@ -511,11 +573,10 @@ def makeplots(exposures, tiles, outdir):
                     <div>{{ skyplot_script }} {{ skyplot_div }}</div>
                     <div>{{ progress_script }} {{ progress_div }}</div>
                     <div>{{ progress_script_1 }} {{ progress_div_1 }}</div>
-                    <div>{{ moonplot_script }} {{ moonplot_div }}</div>
                 </div>
 
                 <div class="header">
-                    <p class="sansserif">Histograms</p>
+                    <p class="sansserif">Observing Conditions</p>
                 </div>
 
                 <div class="flex-container">
@@ -523,6 +584,7 @@ def makeplots(exposures, tiles, outdir):
                     <div>{{ seeing_script }} {{ seeing_div }}</div>
                     <div>{{ transp_hist_script }} {{ transp_hist_div }}</div>
                     <div>{{ exposePerTile_hist_script }} {{ exposePerTile_hist_div }}</div>
+                    <div>{{ moonplot_script }} {{ moonplot_div }}</div>
                     <div>{{ exptime_script }} {{ exptime_div }}</div>
                 </div>
 
@@ -569,7 +631,7 @@ def makeplots(exposures, tiles, outdir):
     exptime_hist = get_exposeTimes_hist(exposures)
     exptime_script, exptime_div = components(exptime_hist)
 
-    moonplot = get_moonplot(exposures)
+    moonplot = get_moonplot(exposures, 500, 300)
     moonplot_script, moonplot_div = components(moonplot)
 
     #- Convert to a jinja2.Template object and render HTML
