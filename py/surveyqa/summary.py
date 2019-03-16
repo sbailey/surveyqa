@@ -131,7 +131,7 @@ def get_summarytable(exposures):
     #adds links to nightly pages to the nights column
     outdir = os.path.join(os.getcwd(), 'survey-qa')
     os.makedirs(outdir, exist_ok=True)
-    template_str = '<a href='+'"/night-<%= nights %>.html"' + ' target="_blank"><%= value%></a>'
+    template_str = '<a href="night-<%= nights %>.html"' + ' target="_blank"><%= value%></a>'
    
     columns = [
         TableColumn(field='nights', title='NIGHT', formatter=HTMLTemplateFormatter(template=template_str)),
