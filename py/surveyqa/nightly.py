@@ -160,8 +160,10 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
                                  'TIME':TIMES})
     
     #- Plot options
-    night_name = exposures['NIGHT'][0]
-    string_date = night_name[4:6] + "-" + night_name[6:] + "-" + night_name[:4]
+
+    # YEARMMDD -> YEAR-MM-DD 
+    night_name = str(exposures['NIGHT'][0]) # cast to str in case column is int
+    string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
 
     fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
     fig.yaxis.axis_label = 'Declination'
