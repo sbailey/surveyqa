@@ -268,6 +268,13 @@ def makeplots(night, exposures, tiles, outdir):
 
     Writes outdir/night-*.html
     '''
+    
+    #getting path for the previous and next night links, first and last night links, link back to summary page
+    [prev_str, next_str] = get_night_link(night, exposures)
+    first_str = get_night_link(exposures['NIGHT'][0], exposures)[0]
+    last_str = get_night_link(exposures['NIGHT'][-1], exposures)[1]
+    summary_str = "summary.html"
+    
     #- Separate calibration exposures
     all_exposures = exposures[exposures['PROGRAM'] != 'CALIB']
     all_calibs = exposures[exposures['PROGRAM'] == 'CALIB']
@@ -376,6 +383,30 @@ def makeplots(night, exposures, tiles, outdir):
     p.sansserif {
         font-family: "Open Serif", Helvetica, sans-serif;
     }
+    
+    ul {
+      list-style-type: none;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #333;
+    }
+
+    li {
+      float: left;
+    }
+
+    li a {
+      display: block;
+      color: white;
+      text-align: center;
+      padding: 14px 16px;
+      text-decoration: none;
+    }
+
+    li a:hover {
+      background-color: #111;
+    }
     </style>
     </head>
     """
@@ -387,6 +418,16 @@ def makeplots(night, exposures, tiles, outdir):
         </div>
     """.format(night)
 
+    template += """
+        <ul>
+          <li><a href={}>First</a></li>
+          <li><a href={}>Previous</a></li>
+          <li><a href={}>Summary Page</a></li>
+          <li><a href={}>Next</a></li>
+          <li><a href={}>Last</a></li>
+        </ul>             
+    """.format(first_str, prev_str, summary_str, next_str, last_str)
+    
     template += """
         <div class="flex-container">
                 <div class="column side"></div>          
@@ -425,3 +466,67 @@ def makeplots(night, exposures, tiles, outdir):
         fx.write(html)
 
     print('Wrote {}'.format(outfile))
+
+def get_exptype_counts(exposures, calibs, width=300, height=300):
+    """
+    Generate a horizontal bar plot showing the counts for each type of exposure grouped 
+    by whether they have FLAVOR='science' or PROGRAM='calib'
+    
+    ARGS:
+        exposures : a table of exposures which only contain those with FLAVOR='science'
+        calibs : a table of exposures which only contains those with PROGRAm='calibs'
+    """
+    darks = len(exposures[exposures['PROGRAM'] == 'DARK'])
+    grays = len(exposures[exposures['PROGRAM'] == 'GRAY'])
+    brights = len(exposures[exposures['PROGRAM'] == 'BRIGHTS'])
+    
+    arcs = len(calibs[calibs['FLAVOR'] == 'arc'])
+    flats = len(calibs[calibs['FLAVOR'] == 'flat'])
+    zeroes = len(calibs[calibs['FLAVOR'] == 'zero'])
+    
+    types = [('calib', 'ZERO'), ('calib', 'FLAT'), ('calib', 'ARC'), 
+            ('science', 'BRIGHT'), ('science', 'GRAY'), ('science', 'DARK')]
+    counts = np.array([zeroes, flats, arcs, brights, grays, darks])
+    
+    src = ColumnDataSource({'types':types, 'counts':counts})
+    
+    p = bk.figure(width=width, height=height,
+                  y_range=FactorRange(*types), title='Exposure Type Counts', 
+                  toolbar_location=None)
+    p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white',
+           fill_color=factor_cmap('types', palette=Spectral6, factors=types), source=src)
+    
+    
+    labels = LabelSet(x='counts', y='types', text='counts', level='glyph', source=src, 
+                      render_mode='canvas', x_offset=5, y_offset=-10, text_color='gray', text_font='sans-serif')
+    p.add_layout(labels)
+    
+    p.ygrid.grid_line_color=None
+    
+    return p
+
+def get_night_link(night, exposures):
+    '''Gets the href string for the previous night and the next night for a given nightly page. 
+        Input:
+            night: night value, string
+            exposures: Table with columns...
+        Output: [previous page href, next page href], elements are strings'''
+    unique_nights = list(np.unique(exposures['NIGHT'])) 
+    ind = unique_nights.index(night)
+    
+    if ind == 0:
+        prev_night = night
+        next_night = unique_nights[ind+1]
+    
+    if ind == (len(unique_nights)-1):
+        prev_night = unique_nights[ind-1]
+        next_night = night
+        
+    if ind != 0 and ind != (len(unique_nights)-1):
+        prev_night = unique_nights[ind-1]
+        next_night = unique_nights[ind+1]
+    
+    prev_str = "night-{}.html".format(prev_night)
+    next_str = "night-{}.html".format(next_night)
+    
+    return [prev_str, next_str]
