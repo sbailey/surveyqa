@@ -164,17 +164,22 @@ def nights_last_observed(exposures):
 tzone = TimezoneInfo(utc_offset = -7*u.hour)
 t1 = Time(58821, format='mjd', scale='utc')
 t = t1.to_datetime(timezone=tzone)
+
+# Data Source for the curser-following vertical line on the progress plots
 line_source = ColumnDataSource(data=dict(x=[t]))
+
+# js code is used as the callback for the HoverTool
 js = '''
+/// get mouse data (location of pointer in the plot)
 var geometry = cb_data['geometry'];
-console.log(geometry);
+
+/// get the current value of x in line_source
 var data = line_source.data;
 var x = data['x'];
-console.log(x);
+
+/// if the mouse is indeed hovering over the plot, change the line_source value
 if (isFinite(geometry.x)) {
-  for (i = 0; i < x.length; i++) {
-    x[i] = geometry.x;
-  }
+  x[0] = geometry.x
   line_source.change.emit();
 }
 '''
