@@ -535,16 +535,33 @@ def get_moonplot(exposures, width=250, height=250):
     p.toolbar_location = None
     return p
 
+def _style_as_placeholder(fig):
+    '''
+    Set border, axes, labels to ight gray for placeholder plots
+
+    Note: Modifies visual style of input fig
+    '''
+    lightgray = '#cccccc'
+    fig.outline_line_color = lightgray
+    for axis in [fig.xaxis, fig.yaxis]:
+        axis.axis_line_color = lightgray
+        axis.axis_label_text_color = lightgray
+        axis.major_tick_line_color = lightgray
+        axis.minor_tick_line_color = lightgray
+        axis.major_label_text_color = lightgray
+
 def get_skybrightness(width=250, height=250):
     """Placeholder graph for sky background brightness plot
     Options: plot width, height in pixels
     returns a bokeh figure object"""
     
-    p = bk.figure(plot_width=width, plot_height=height, x_axis_label="Brightness")
+    p = bk.figure(plot_width=width, plot_height=height,
+            x_axis_label="PLACEHOLDER: Sky Brightness")
+    _style_as_placeholder(p)
     
     x = np.linspace(0, 10, 20)
     y = np.random.standard_normal(20)
-    p.circle(x,y)
+    p.circle(x,y, color='#cccccc')
     p.toolbar_location = None
     
     return p
@@ -554,11 +571,13 @@ def get_hourangle(width=250, height=250):
     Options: plot width, height in pixels
     returns a bokeh figure object"""
     
-    p = bk.figure(plot_width=width, plot_height=height, x_axis_label="hour angle")
+    p = bk.figure(plot_width=width, plot_height=height,
+            x_axis_label="PLACEHOLDER: hour angle")
+    _style_as_placeholder(p)
     
     x = np.linspace(0, 10, 20)
     y = np.random.standard_normal(20)
-    p.circle(x,y)
+    p.circle(x,y, color='#cccccc')
     p.toolbar_location = None
     
     return p
@@ -568,11 +587,13 @@ def get_expTimePerTile(width=250, height=250):
     Options: plot width, height in pixels
     returns a bokeh figure object"""
     
-    p = bk.figure(plot_width=width, plot_height=height, x_axis_label="exp time per tile")
+    p = bk.figure(plot_width=width, plot_height=height,
+            x_axis_label="PLACEHOLDER: exptime per tile")
+    _style_as_placeholder(p)
     
     x = np.linspace(0, 10, 20)
     y = np.random.standard_normal(20)
-    p.circle(x,y)
+    p.circle(x,y, color='#cccccc')
     p.toolbar_location = None
     
     return p
