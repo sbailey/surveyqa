@@ -38,7 +38,7 @@ def nights_first_observed(exposures, tiles):
 
     return nights, nights_int
 
-def get_skyplot(exposures, tiles, width=600, height=300):
+def get_skyplot(exposures, tiles, width=500, height=250):
     '''
     Generates sky plot of DESI survey tiles and progress. Colorcoded by night each tile was first
     observed, uses nights_first_observed function defined previously in this module to retrieve
@@ -69,14 +69,14 @@ def get_skyplot(exposures, tiles, width=600, height=300):
     color_mapper = LinearColorMapper(palette="Viridis256", low=nights_int.min(), high=nights_int.max())
 
     ##making figure
-    fig = bk.figure(width=600, height=300)
+    fig = bk.figure(width=width, height=height)
 
     #unobserved tiles
     fig.circle('RA', 'DEC', source=source, color='gray', radius=0.25)
 
     #observed tiles
     fig.circle('RA_obs', 'DEC_obs', color=transform('MJD', color_mapper), size=3, alpha=0.85, source=source_obs)
-    color_bar = ColorBar(color_mapper=color_mapper, label_standoff=12, location=(0,0), title='MJD')
+    color_bar = ColorBar(color_mapper=color_mapper, label_standoff=12, location=(0,0), title='MJD', width=5)
     fig.add_layout(color_bar, 'right')
 
     fig.xaxis.axis_label = 'RA [degrees]'
@@ -188,7 +188,7 @@ hover_follow = HoverTool(tooltips=None,
                       point_policy='follow_mouse',
                       callback=CustomJS(code=js, args={'line_source': line_source}))
 
-def get_surveyprogress(exposures, tiles, width=300, height=300):
+def get_surveyprogress(exposures, tiles, width=250, height=250):
     '''
     Generates a plot of survey progress (EXPOSEFAC) vs. time
 
@@ -283,7 +283,7 @@ def get_surveyprogress(exposures, tiles, width=300, height=300):
     fig1.add_tools(hover_follow)
     return fig1
 
-def get_surveyTileprogress(exposures, tiles, width=300, height=300):
+def get_surveyTileprogress(exposures, tiles, width=250, height=250):
     '''
     Generates a plot of survey progress (total tiles) vs. time
 
@@ -413,7 +413,7 @@ def get_linked_progress_plots(exposures, tiles, width=300, height=300):
     tileprogress = get_surveyTileprogress(exposures, tiles, width=width, height=height)
     return gridplot([surveyprogress, tileprogress], ncols=2, plot_width=width, plot_height=height, toolbar_location="right")
 
-def get_hist(exposures, attribute, color, width=300, height=300):
+def get_hist(exposures, attribute, color, width=250, height=250):
     '''
     Generates a histogram of the attribute provided for the given exposures table
 
@@ -432,12 +432,13 @@ def get_hist(exposures, attribute, color, width=300, height=300):
 
     hist, edges = np.histogram(exposures_nocalib[attribute], density=True, bins=50)
 
-    fig_0 = bk.figure(plot_width=width, plot_height=height, title = attribute + " Histogram",
-                    x_axis_label = attribute, y_axis_label = "Distribution")
+    fig_0 = bk.figure(plot_width=width, plot_height=height,
+                    x_axis_label = attribute.title())
     fig_0.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5)
+    fig_0.toolbar_location = None
     return fig_0
 
-def get_exposuresPerTile_hist(exposures, color, width=300, height=300):
+def get_exposuresPerTile_hist(exposures, color, width=250, height=250):
     '''
     Generates a histogram of the number of exposures per tile for the given
     exposures table
@@ -461,12 +462,13 @@ def get_exposuresPerTile_hist(exposures, color, width=300, height=300):
 
     hist, edges = np.histogram(exposures_nocalib["ones"], density=True, bins=np.arange(0, np.max(exposures_nocalib["ones"])+1))
 
-    fig_3 = bk.figure(plot_width=width, plot_height=height, title = "# Exposures per Tile Histogram",
-                    x_axis_label = "# Exposures per Tile", y_axis_label = "Distribution")
+    fig_3 = bk.figure(plot_width=width, plot_height=height,
+                    x_axis_label = "# Exposures per Tile")
     fig_3.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color="orange", alpha=0.5)
+    fig_3.toolbar_location = None
     return fig_3
 
-def get_exposeTimes_hist(exposures, width=600, height=400):
+def get_exposeTimes_hist(exposures, width=500, height=300):
     '''
     Generates three overlaid histogram of the exposure times for the given
     exposures table. Each of the histograms correspond to different
@@ -483,8 +485,8 @@ def get_exposeTimes_hist(exposures, width=600, height=400):
     keep = exposures['PROGRAM'] != 'CALIB'
     exposures_nocalib = exposures[keep]
 
-    fig = bk.figure(plot_width=width, plot_height=height, title = "Exposure Times Histogram",
-                    x_axis_label = "Exposure Time", y_axis_label = "Distribution")
+    fig = bk.figure(plot_width=width, plot_height=height, title = "Exposure Times",
+                    x_axis_label = "Exposure Time")
 
     def exptime_dgb(string, color):
         a = exposures_nocalib[exposures_nocalib["PROGRAM"] == string]
@@ -496,9 +498,10 @@ def get_exposeTimes_hist(exposures, width=600, height=400):
     exptime_dgb("BRIGHT", "green")
 
     fig.legend.click_policy="hide"
+    fig.toolbar_location = None
     return fig
 
-def get_moonplot(exposures, width=300, height=300):
+def get_moonplot(exposures, width=250, height=250):
     '''
     Generates a scatter plot of MOONFRAC vs MOONALT. Each point is then colored
     with a gradient corresponding to its MOONSEP.
@@ -524,11 +527,75 @@ def get_moonplot(exposures, width=300, height=300):
             MOONSEP = exposures_nocalib["MOONSEP"]
         ))
 
-    color_bar = ColorBar(color_mapper=color_mapper, label_standoff=12, location=(0,0), title='MOONSEP')
+    color_bar = ColorBar(color_mapper=color_mapper, label_standoff=12, location=(0,0), width=5)
     p.add_layout(color_bar, 'right')
     p.title.text = 'MOONFRAC vs MOONALT, colored with MOONSEP'
 
     p.circle("MOONFRAC", "MOONALT", color=transform('MOONSEP', color_mapper), alpha=0.5, source=source)
+    p.toolbar_location = None
+    return p
+
+def _style_as_placeholder(fig):
+    '''
+    Set border, axes, labels to ight gray for placeholder plots
+
+    Note: Modifies visual style of input fig
+    '''
+    lightgray = '#cccccc'
+    fig.outline_line_color = lightgray
+    for axis in [fig.xaxis, fig.yaxis]:
+        axis.axis_line_color = lightgray
+        axis.axis_label_text_color = lightgray
+        axis.major_tick_line_color = lightgray
+        axis.minor_tick_line_color = lightgray
+        axis.major_label_text_color = lightgray
+
+def get_skybrightness(width=250, height=250):
+    """Placeholder graph for sky background brightness plot
+    Options: plot width, height in pixels
+    returns a bokeh figure object"""
+    
+    p = bk.figure(plot_width=width, plot_height=height,
+            x_axis_label="PLACEHOLDER: Sky Brightness")
+    _style_as_placeholder(p)
+    
+    x = np.linspace(0, 10, 20)
+    y = np.random.standard_normal(20)
+    p.circle(x,y, color='#cccccc')
+    p.toolbar_location = None
+    
+    return p
+
+def get_hourangle(width=250, height=250):
+    """Placeholder graph for hour angle plot
+    Options: plot width, height in pixels
+    returns a bokeh figure object"""
+    
+    p = bk.figure(plot_width=width, plot_height=height,
+            x_axis_label="PLACEHOLDER: hour angle")
+    _style_as_placeholder(p)
+    
+    x = np.linspace(0, 10, 20)
+    y = np.random.standard_normal(20)
+    p.circle(x,y, color='#cccccc')
+    p.toolbar_location = None
+    
+    return p
+
+def get_expTimePerTile(width=250, height=250):
+    """Placeholder graph for exposure time summed for each tile plot
+    Options: plot width, height in pixels
+    returns a bokeh figure object"""
+    
+    p = bk.figure(plot_width=width, plot_height=height,
+            x_axis_label="PLACEHOLDER: exptime per tile")
+    _style_as_placeholder(p)
+    
+    x = np.linspace(0, 10, 20)
+    y = np.random.standard_normal(20)
+    p.circle(x,y, color='#cccccc')
+    p.toolbar_location = None
+    
     return p
 
 def makeplots(exposures, tiles, outdir):
@@ -575,30 +642,30 @@ def makeplots(exposures, tiles, outdir):
     .header {
         font-family: "Open Serif", Arial, Helvetica, sans-serif;
         background-color: #f1f1f1;
-        padding: 20px;
-        text-align: center;
+        padding: 10px;
+        text-align: left;
         justify: space-around;
     }
 
     .column {
         float: center;
-        padding: 10px
     }
 
     .column.side {
-        width = 20%;
+        width = 10%;
     }
 
     .column.middle {
-        width = 60%;
+        width = 80%;
     }
 
     .flex-container {
         display: flex;
         flex-direction: row;
         flex-flow: row wrap;
-        justify-content: space-around;
-        padding: 20px;
+        justify-content: flex-start;
+        padding: 10px;
+        align-items: flex-end;
     }
 
     p.sansserif {
@@ -610,20 +677,15 @@ def makeplots(exposures, tiles, outdir):
 
     template += """
     <body>
-        <div class="header">
-            <h1>DESI SURVEY QA</h1>
-            <p>Through night {}</p>
+        <div class="flex-container">
+            <div class="column side"></div>
+            <div class="column middle"> 
+                <div class="header">
+                    <p class='sansserif'>DESI Survey QA through {}</p>
         </div>
     """.format(max(exposures['NIGHT']))
 
     template += """
-        <div class="flex-container">
-            <div class="column side"></div>
-            <div class="column middle">
-                <div class="header">
-                    <p class="sansserif">Progress Graphs</p>
-                </div>
-
                 <div class="flex-container">
                     <div>{{ skyplot_script }} {{ skyplot_div }}</div>
                     <div>{{ progress_script }} {{ progress_div }}</div>
@@ -640,6 +702,9 @@ def makeplots(exposures, tiles, outdir):
                     <div>{{ exposePerTile_hist_script }} {{ exposePerTile_hist_div }}</div>
                     <div>{{ moonplot_script }} {{ moonplot_div }}</div>
                     <div>{{ exptime_script }} {{ exptime_div }}</div>
+                    <div>{{ brightness_script }} {{ brightness_div }}</div>
+                    <div>{{ hourangle_script }} {{ hourangle_div }}</div>
+                    <div>{{ expTimePerTile_script}} {{ expTimePerTile_div }}</div>
                 </div>
 
                 <div class="header">
@@ -658,32 +723,41 @@ def makeplots(exposures, tiles, outdir):
     </html>
     """
 
-    skyplot = get_skyplot(exposures, tiles)
+    skyplot = get_skyplot(exposures, tiles, 500, 250)
     skyplot_script, skyplot_div = components(skyplot)
 
-    progressplot = get_linked_progress_plots(exposures, tiles)
+    progressplot = get_linked_progress_plots(exposures, tiles, 250, 250)
     progress_script, progress_div = components(progressplot)
 
     summarytable = get_summarytable(exposures)
     summarytable_script, summarytable_div = components(summarytable)
 
-    seeing_hist = get_hist(exposures, "SEEING", "navy")
+    seeing_hist = get_hist(exposures, "SEEING", "navy", 250, 250)
     seeing_script, seeing_div = components(seeing_hist)
 
-    airmass_hist = get_hist(exposures, "AIRMASS", "green")
+    airmass_hist = get_hist(exposures, "AIRMASS", "green", 250, 250)
     airmass_script, airmass_div = components(airmass_hist)
 
-    transp_hist = get_hist(exposures, "TRANSP", "purple")
+    transp_hist = get_hist(exposures, "TRANSP", "purple", 250, 250)
     transp_hist_script, transp_hist_div = components(transp_hist)
 
-    exposePerTile_hist = get_exposuresPerTile_hist(exposures, "orange")
+    exposePerTile_hist = get_exposuresPerTile_hist(exposures, "orange", 250, 250)
     exposePerTile_hist_script, exposePerTile_hist_div = components(exposePerTile_hist)
 
-    exptime_hist = get_exposeTimes_hist(exposures)
+    exptime_hist = get_exposeTimes_hist(exposures, 500, 250)
     exptime_script, exptime_div = components(exptime_hist)
 
-    moonplot = get_moonplot(exposures, 500, 300)
+    moonplot = get_moonplot(exposures, 500, 250)
     moonplot_script, moonplot_div = components(moonplot)
+    
+    brightnessplot = get_skybrightness(250, 250)
+    brightness_script, brightness_div = components(brightnessplot)
+    
+    hourangleplot = get_hourangle(250, 250)
+    hourangle_script, hourangle_div = components(hourangleplot)
+    
+    expTimePerTile_plot = get_expTimePerTile(250, 250)
+    expTimePerTile_script, expTimePerTile_div = components(expTimePerTile_plot)
 
     #- Convert to a jinja2.Template object and render HTML
     html = jinja2.Template(template).render(
@@ -695,7 +769,10 @@ def makeplots(exposures, tiles, outdir):
         exptime_script=exptime_script, exptime_div=exptime_div,
         transp_hist_script=transp_hist_script, transp_hist_div=transp_hist_div,
         exposePerTile_hist_script=exposePerTile_hist_script, exposePerTile_hist_div=exposePerTile_hist_div,
-        moonplot_script=moonplot_script, moonplot_div=moonplot_div
+        moonplot_script=moonplot_script, moonplot_div=moonplot_div,
+        brightness_script=brightness_script, brightness_div=brightness_div,
+        hourangle_script=hourangle_script, hourangle_div=hourangle_div,
+        expTimePerTile_script=expTimePerTile_script, expTimePerTile_div=expTimePerTile_div,
         )
 
     outfile = os.path.join(outdir, 'summary.html')
