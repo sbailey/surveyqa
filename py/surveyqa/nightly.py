@@ -96,10 +96,21 @@ def plot_timeseries(times, values, name, color, x_range=None, title=None, width=
     fig.ygrid.grid_line_color = None
     fig.xgrid.grid_line_color = None
     fig.outline_line_color = None
-    fig.yaxis.axis_label = name
+    fig.yaxis.axis_label = name.title()
 
     return fig
 
+def hourangle_timeseries(width=600, height=200):
+    '''Placeholder for a hour angle vs. time plot'''
+    p = bk.figure(plot_width=width, plot_height=height, y_axis_label='Hour Angle')
+    p.toolbar_location = None
+    return p
+
+def brightness_timeseries(width=600, height=200):
+    '''Placeholder for a sky brightness timeseries plot'''
+    p = bk.figure(plot_width=width, plot_height=height, y_axis_label='Sky Brightness')
+    p.toolbar_location = None
+    return p
 
 def get_nightlytable(exposures):
     '''
@@ -252,13 +263,26 @@ def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, h
     hist_all, edges_all = np.histogram(np.array(all_exposures[attribute]), density=True, bins=50)
     hist_night, edges_night = np.histogram(np.array(night_exposures[attribute]), density=True, bins=50)
 
-    fig = bk.figure(plot_width=width, plot_height=height, # title = attribute + " Histogram",
-                    x_axis_label = attribute, y_axis_label = "Distribution")
+    fig = bk.figure(plot_width=width, plot_height=height, # title = attribute + " Histogram", 
+                    x_axis_label = attribute.title())
     fig.quad(top=hist_all, bottom=0, left=edges_all[:-1], right=edges_all[1:], fill_color=color, alpha=0.2)
     fig.quad(top=hist_night, bottom=0, left=edges_night[:-1], right=edges_night[1:], fill_color=color, alpha=0.6)
     
+    fig.toolbar_location = None
+    
     return fig
 
+def hourangle_hist(width=400, height=200):
+    '''Placeholder for a hour angle vs. time plot'''
+    p = bk.figure(plot_width=width, plot_height=height)
+    p.toolbar_location = None
+    return p
+
+def brightness_hist(width=400, height=200):
+    '''Placeholder for a sky brightness timeseries plot'''
+    p = bk.figure(plot_width=width, plot_height=height)
+    p.toolbar_location = None
+    return p
 
 def makeplots(night, exposures, tiles, outdir):
     '''
@@ -290,16 +314,22 @@ def makeplots(night, exposures, tiles, outdir):
     title='Airmass, Seeing, Exptime vs. Time for {}/{}/{}'.format(night[4:6], night[6:], night[:4])
     #- Get timeseries plots for several variables
     x, y = get_timeseries(exposures, 'AIRMASS')
-    airmass = plot_timeseries(x, y, 'AIRMASS', 'green', x_range=None, title=title)
+    airmass = plot_timeseries(x, y, 'AIRMASS', 'green', x_range=None, title=title, width=600, height=200)
 
     x, y = get_timeseries(exposures, 'SEEING')
-    seeing = plot_timeseries(x, y, 'SEEING', 'navy', x_range=airmass.x_range)
+    seeing = plot_timeseries(x, y, 'SEEING', 'navy', x_range=airmass.x_range, width=600, height=200)
 
     x, y = get_timeseries(exposures, 'EXPTIME')
-    exptime = plot_timeseries(x, y, 'EXPTIME', 'darkorange', x_range=airmass.x_range)
+    exptime = plot_timeseries(x, y, 'EXPTIME', 'darkorange', x_range=airmass.x_range, width=600, height=200)
+    
+    x, y, = get_timeseries(exposures, 'TRANSP')
+    transp = plot_timeseries(x, y, 'TRANSP', 'purple', x_range=airmass.x_range, width=600, height=200)
+    
+    hourangle = hourangle_timeseries(width=600, height=200)
+    brightness = brightness_timeseries(width=600, height=200)
 
     #- Convert these to the components to include in the HTML
-    timeseries_script, timeseries_div = components(bk.Column(airmass, seeing, exptime))
+    timeseries_script, timeseries_div = components(bk.Column(airmass, seeing, exptime, transp, hourangle, brightness))
 
     #making the nightly table of values
     nightlytable = get_nightlytable(exposures)
@@ -310,16 +340,19 @@ def makeplots(night, exposures, tiles, outdir):
     skypathplot_script, skypathplot_div = components(skypathplot)
     
     #adding in the components of the exposure types bar plot
-    exptypecounts = get_exptype_counts(exposures, calibs, width=300, height=300)
+    exptypecounts = get_exptype_counts(exposures, calibs, width=400, height=300)
     exptypecounts_script, exptypecounts_div = components(exptypecounts)
     
     #- Get overlaid histograms for several variables
-    airmasshist = overlaid_hist(all_exposures, exposures, 'AIRMASS', 'green')
-    seeinghist = overlaid_hist(all_exposures, exposures, 'SEEING', 'navy')
-    transphist = overlaid_hist(all_exposures, exposures, 'TRANSP', 'purple')
+    airmasshist = overlaid_hist(all_exposures, exposures, 'AIRMASS', 'green', 400, 200)
+    seeinghist = overlaid_hist(all_exposures, exposures, 'SEEING', 'navy', 400, 200)
+    exptimehist = overlaid_hist(all_exposures, exposures, 'EXPTIME', 'darkorange', 400, 200)
+    transphist = overlaid_hist(all_exposures, exposures, 'TRANSP', 'purple', 400, 200)
+    houranglehist = hourangle_hist(width=400, height=200)
+    brightnesshist = brightness_hist(width=400, height=200)
     
     #adding in the components of the overlaid histograms
-    overlaidhists_script, overlaidhists_div = components(bk.Column(airmasshist, seeinghist, transphist))
+    overlaidhists_script, overlaidhists_div = components(bk.Column(airmasshist, seeinghist, exptimehist, transphist, houranglehist, brightnesshist))
     
     
     #----
@@ -358,7 +391,7 @@ def makeplots(night, exposures, tiles, outdir):
     .header {
         font-family: "Open Serif", Arial, Helvetica, sans-serif;
         background-color: #f1f1f1;
-        padding: 20px;
+        padding: 10px;
         text-align: center;
         justify: space-around;
     }
@@ -381,7 +414,7 @@ def makeplots(night, exposures, tiles, outdir):
         flex-direction: row;
         flex-flow: row wrap;
         justify-content: space-around;
-        padding: 20px;
+        padding: 10px;
     }
     
     p.sansserif {
@@ -397,15 +430,16 @@ def makeplots(night, exposures, tiles, outdir):
     }
 
     li {
-      float: left;
+      float: right;
     }
 
     li a {
       display: block;
       color: white;
       text-align: center;
-      padding: 14px 16px;
+      padding: 20px;
       text-decoration: none;
+      font-family: "Open Serif", "Arial", sans-serif;
     }
 
     li a:hover {
@@ -416,25 +450,18 @@ def makeplots(night, exposures, tiles, outdir):
     """
     template += """
     <body>
-        <div class="header">
-            <h1>DESI SURVEY QA</h1>
-            <p>NIGHT: {}</p>
-        </div>
-    """.format(night)
-
-    template += """
         <ul>
+          <li style="float:left"><a>DESI Survey QA Night {}</a></li>
           <li><a href={}>First</a></li>
           <li><a href={}>Previous</a></li>
           <li><a href={}>Summary Page</a></li>
           <li><a href={}>Next</a></li>
           <li><a href={}>Last</a></li>
         </ul>             
-    """.format(first_str, prev_str, summary_str, next_str, last_str)
+    """.format(night, first_str, prev_str, summary_str, next_str, last_str)
     
     template += """
-        <div class="flex-container">
-                <div class="column side"></div>          
+        <div class="flex-container">         
                 <div class="column middle">
                     <div class="flex-container">
                         <div>{{ skypathplot_script }} {{ skypathplot_div}}</div>
@@ -448,7 +475,6 @@ def makeplots(night, exposures, tiles, outdir):
 
                     <div class="flex-container">{{ table_script }}{{ table_div }}</div>     
                 </div>
-                <div class="column side"></div>
             </div>
     </body>
 
