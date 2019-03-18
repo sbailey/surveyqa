@@ -9,7 +9,8 @@ import jinja2
 from bokeh.embed import components
 import bokeh
 import bokeh.plotting as bk
-from bokeh.models import ColumnDataSource, LinearColorMapper, ColorBar, HoverTool, HTMLTemplateFormatter
+from bokeh.models import ColumnDataSource, LinearColorMapper, ColorBar, HoverTool, CustomJS, HTMLTemplateFormatter
+from bokeh.layouts import gridplot
 from bokeh.transform import transform
 from astropy.time import Time, TimezoneInfo
 from astropy.table import Table, join
@@ -132,7 +133,7 @@ def get_summarytable(exposures):
     outdir = os.path.join(os.getcwd(), 'survey-qa')
     os.makedirs(outdir, exist_ok=True)
     template_str = '<a href="night-<%= nights %>.html"' + ' target="_blank"><%= value%></a>'
-   
+
     columns = [
         TableColumn(field='nights', title='NIGHT', formatter=HTMLTemplateFormatter(template=template_str)),
         TableColumn(field='totals', title='Total Exposures'),
@@ -160,9 +161,36 @@ def nights_last_observed(exposures):
         return arr[len(arr)-1]
     return exposures.group_by("TILEID").groups.aggregate(last)
 
+tzone = TimezoneInfo(utc_offset = -7*u.hour)
+t1 = Time(58821, format='mjd', scale='utc')
+t = t1.to_datetime(timezone=tzone)
+
+# Data Source for the curser-following vertical line on the progress plots
+line_source = ColumnDataSource(data=dict(x=[t]))
+
+# js code is used as the callback for the HoverTool
+js = '''
+/// get mouse data (location of pointer in the plot)
+var geometry = cb_data['geometry'];
+
+/// get the current value of x in line_source
+var data = line_source.data;
+var x = data['x'];
+
+/// if the mouse is indeed hovering over the plot, change the line_source value
+if (isFinite(geometry.x)) {
+  x[0] = geometry.x
+  line_source.change.emit();
+}
+'''
+
+hover_follow = HoverTool(tooltips=None,
+                      point_policy='follow_mouse',
+                      callback=CustomJS(code=js, args={'line_source': line_source}))
+
 def get_surveyprogress(exposures, tiles, width=300, height=300):
     '''
-    Generates a plot of survey progress vs. time
+    Generates a plot of survey progress (EXPOSEFAC) vs. time
 
     Args:
         exposures: Table of exposures with columns "PROGRAM", "TILEID", "MJD"
@@ -179,8 +207,6 @@ def get_surveyprogress(exposures, tiles, width=300, height=300):
     tne = join(nights_last_observed(exposures_nocalib["TILEID", "MJD"]), tiles, keys="TILEID", join_type='inner')
     tne.sort('MJD')
 
-    tzone = TimezoneInfo(utc_offset = -7*u.hour)
-
     def bgd(string):
         tne_d = tne[tne["PROGRAM"] == string]
         x_d = np.array(tne_d['MJD'])
@@ -196,6 +222,7 @@ def get_surveyprogress(exposures, tiles, width=300, height=300):
         return (t, y_d)
 
     hover = HoverTool(
+            names=["D", "G", "B"],
             tooltips=[
                 ("DATE", "@date"),
                 ("TOTAL PERCENTAGE", "@y")
@@ -242,21 +269,23 @@ def get_surveyprogress(exposures, tiles, width=300, height=300):
 
     fig1.xaxis.major_label_orientation = np.pi/4
 
-    fig1.line('x', 'y', source=source_d, line_width=2, color = "red", legend = "DARK")
-    fig1.line('x', 'y', source=source_g, line_width=2, color = "blue", legend = "GREY")
-    fig1.line('x', 'y', source=source_b, line_width=2, color = "green", legend = "BRIGHT")
+    fig1.line('x', 'y', source=source_d, line_width=2, color = "red", legend = "DARK", name = "D")
+    fig1.line('x', 'y', source=source_g, line_width=2, color = "blue", legend = "GREY", name = "G")
+    fig1.line('x', 'y', source=source_b, line_width=2, color = "green", legend = "BRIGHT", name = "B")
     fig1.line('x', 'y', source=source_line, line_width=2, color = "grey", line_dash = "dashed")
+    fig1.segment(x0='x', y0=0, x1='x', y1=1, color='grey', line_width=1, source=line_source)
 
     fig1.legend.location = "top_left"
     fig1.legend.click_policy="hide"
     fig1.legend.spacing = 0
 
     fig1.add_tools(hover)
+    fig1.add_tools(hover_follow)
     return fig1
 
 def get_surveyTileprogress(exposures, tiles, width=300, height=300):
     '''
-    Generates a plot of survey progress vs. time
+    Generates a plot of survey progress (total tiles) vs. time
 
     Args:
         exposures: Table of exposures with columns "PROGRAM", "MJD", "TILEID"
@@ -287,6 +316,7 @@ def get_surveyTileprogress(exposures, tiles, width=300, height=300):
         return (t, y_d)
 
     hover = HoverTool(
+            names=["G", "D", "B"],
             tooltips=[
                 ("DATE", "@date"),
                 ("# tiles", "@y")
@@ -353,16 +383,35 @@ def get_surveyTileprogress(exposures, tiles, width=300, height=300):
     fig.line('x', 'y', source=source_line_d, line_width=2, color = "red", line_dash = "dashed", alpha = 0.5)
     fig.line('x', 'y', source=source_line_g, line_width=2, color = "blue", line_dash = "dashed", alpha = 0.5)
     fig.line('x', 'y', source=source_line_b, line_width=2, color = "green", line_dash = "dashed", alpha = 0.5)
-    fig.line('x', 'y', source=source_d, line_width=2, color = "red", legend = "DARK")
-    fig.line('x', 'y', source=source_g, line_width=2, color = "blue", legend = "GRAY")
-    fig.line('x', 'y', source=source_b, line_width=2, color = "green", legend = "BRIGHT")
+    fig.line('x', 'y', source=source_d, line_width=2, color = "red", legend = "DARK", name = "D")
+    fig.line('x', 'y', source=source_g, line_width=2, color = "blue", legend = "GRAY", name = "G")
+    fig.line('x', 'y', source=source_b, line_width=2, color = "green", legend = "BRIGHT", name = "B")
+    fig.segment(x0='x', y0=0, x1='x', y1=8000, color='grey', line_width=1, source=line_source)
 
     fig.legend.location = "top_left"
     fig.legend.click_policy="hide"
     fig.legend.spacing = 0
 
     fig.add_tools(hover)
+    fig.add_tools(hover_follow)
     return fig
+
+def get_linked_progress_plots(exposures, tiles, width=300, height=300):
+    '''
+    Generates linked progress plots of frac(EXPOSEFAC) vs. time, and (total # of tiles) vs. time
+
+    Args:
+        exposures: Table of exposures with columns "PROGRAM", "MJD", "TILEID"
+        tiles: Table of tile locations with columns "TILEID", "EXPOSEFAC", "PROGRAM"
+
+    Options:
+        width, height: plot width and height in pixels
+
+    Returns bokeh Layout object
+    '''
+    surveyprogress = get_surveyprogress(exposures, tiles, width=width, height=height)
+    tileprogress = get_surveyTileprogress(exposures, tiles, width=width, height=height)
+    return gridplot([surveyprogress, tileprogress], ncols=2, plot_width=width, plot_height=height, toolbar_location="right")
 
 def get_hist(exposures, attribute, color, width=300, height=300):
     '''
@@ -578,7 +627,6 @@ def makeplots(exposures, tiles, outdir):
                 <div class="flex-container">
                     <div>{{ skyplot_script }} {{ skyplot_div }}</div>
                     <div>{{ progress_script }} {{ progress_div }}</div>
-                    <div>{{ progress_script_1 }} {{ progress_div_1 }}</div>
                 </div>
 
                 <div class="header">
@@ -613,11 +661,8 @@ def makeplots(exposures, tiles, outdir):
     skyplot = get_skyplot(exposures, tiles)
     skyplot_script, skyplot_div = components(skyplot)
 
-    progressplot = get_surveyprogress(exposures, tiles)
+    progressplot = get_linked_progress_plots(exposures, tiles)
     progress_script, progress_div = components(progressplot)
-
-    progressplot_1 = get_surveyTileprogress(exposures, tiles)
-    progress_script_1, progress_div_1 = components(progressplot_1)
 
     summarytable = get_summarytable(exposures)
     summarytable_script, summarytable_div = components(summarytable)
@@ -644,7 +689,6 @@ def makeplots(exposures, tiles, outdir):
     html = jinja2.Template(template).render(
         skyplot_script=skyplot_script, skyplot_div=skyplot_div,
         progress_script=progress_script, progress_div=progress_div,
-        progress_script_1=progress_script_1, progress_div_1=progress_div_1,
         summarytable_script=summarytable_script, summarytable_div=summarytable_div,
         airmass_script=airmass_script, airmass_div=airmass_div,
         seeing_script=seeing_script, seeing_div=seeing_div,
