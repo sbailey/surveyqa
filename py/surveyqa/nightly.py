@@ -52,29 +52,28 @@ def find_night(exposures, night):
     return exposures
 
 
-def get_timeseries(exposures, name):
+def get_timeseries(cds, name):
     """
     Generates times and values arrays for column `name`
     
     ARGS:
-        exposures : Table of exposures with columns...
-        name : String corresponding to a column in EXPOSURES
+        cds : ColumnDataSource of exposures
+        name : String corresponding to a column in CDS
     
     Returns numpy array objects
     """
-    x = np.array(exposures['TIME'])
-    y = np.array(exposures[name])
+    x = np.array(cds.data['TIME'])
+    y = np.array(cds.data[name])
     
     return x, y
 
 
-def plot_timeseries(times, values, name, color, x_range=None, title=None, width=400, height=150):
+def plot_timeseries(source, name, color, tools=None, x_range=None, title=None, tooltips=None, width=400, height=150):
     """
-    Plots VALUES vs. TIMES
+    Plots values corresponding to NAME from SOURCE vs. time with TOOLS
 
     ARGS:
-        times : array of times in hours
-        values : array of values to plot
+        source : ColumnDataSource of exposures
         name : string name of this timeseries
         color : color for plotted data points
         x_range : a range of x values to link multiple plots together
@@ -82,15 +81,20 @@ def plot_timeseries(times, values, name, color, x_range=None, title=None, width=
     Options:
         height, width = height and width of the graph in pixels
         x_range = x-axis range of the graph
+        tools = interactive features
         title = graph title
 
     Returns bokeh figure object
     """
-    fig = bk.figure(width=width, height=height, toolbar_location=None, 
+
+    times, values = get_timeseries(source, name)
+    
+    fig = bk.figure(width=width, height=height, tools=tools,
                     x_axis_type='datetime', x_range=x_range, 
                     active_scroll='wheel_zoom', title=title)
-    fig.line(times, values)
-    fig.circle(times, values, line_color=color, fill_color='white', size=6, line_width=2)
+    fig.line('TIME', name, source=source)
+    r = fig.circle('TIME', name, line_color=color, fill_color='white', 
+                   size=6, line_width=2, hover_color='firebrick', source=source)
     
     #- Formatting
     fig.ygrid.grid_line_color = None
@@ -98,6 +102,10 @@ def plot_timeseries(times, values, name, color, x_range=None, title=None, width=
     fig.outline_line_color = None
     fig.yaxis.axis_label = name.title()
 
+    #- Add hover tool
+    hover = HoverTool(renderers = [r], tooltips=tooltips)
+    fig.add_tools(hover)
+    
     return fig
 
 def hourangle_timeseries(width=600, height=200):
@@ -311,20 +319,23 @@ def makeplots(night, exposures, tiles, outdir):
     exposures = find_night(all_exposures, night)
     calibs = find_night(all_calibs, night)
     
+    #- Plot options
     title='Airmass, Seeing, Exptime vs. Time for {}/{}/{}'.format(night[4:6], night[6:], night[:4])
+    TOOLS = ['box_zoom', 'reset', 'wheel_zoom']
+    TOOLTIPS = [("EXPID", "@EXPID"), ("Airmass", "@AIRMASS"), ("Seeing", "@SEEING"), 
+                ("Exposure Time", "@EXPTIME"), ("Transparency", "@TRANSP")]
+    
+    #- Create ColumnDataSource for linking timeseries plots
+    COLS = ['EXPID', 'TIME', 'AIRMASS', 'SEEING', 'EXPTIME', 'TRANSP', 'SKY']
+    src = ColumnDataSource(data={c:np.array(exposures[c]) for c in COLS})
+    
     #- Get timeseries plots for several variables
-    x, y = get_timeseries(exposures, 'AIRMASS')
-    airmass = plot_timeseries(x, y, 'AIRMASS', 'green', x_range=None, title=title, width=600, height=200)
-
-    x, y = get_timeseries(exposures, 'SEEING')
-    seeing = plot_timeseries(x, y, 'SEEING', 'navy', x_range=airmass.x_range, width=600, height=200)
-
-    x, y = get_timeseries(exposures, 'EXPTIME')
-    exptime = plot_timeseries(x, y, 'EXPTIME', 'darkorange', x_range=airmass.x_range, width=600, height=200)
+    airmass = plot_timeseries(src, 'AIRMASS', 'green', tools=TOOLS, x_range=None, title=title, tooltips=TOOLTIPS, width=600, height=200)
+    seeing = plot_timeseries(src, 'SEEING', 'navy', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
+    exptime = plot_timeseries(src, 'EXPTIME', 'darkorange', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
+    transp = plot_timeseries(src, 'TRANSP', 'purple', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
     
-    x, y, = get_timeseries(exposures, 'TRANSP')
-    transp = plot_timeseries(x, y, 'TRANSP', 'purple', x_range=airmass.x_range, width=600, height=200)
-    
+    #placeholders
     hourangle = hourangle_timeseries(width=600, height=200)
     brightness = brightness_timeseries(width=600, height=200)
 
