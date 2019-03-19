@@ -101,7 +101,8 @@ def plot_timeseries(source, name, color, tools=None, x_range=None, title=None, t
     fig.xgrid.grid_line_color = None
     fig.outline_line_color = None
     fig.yaxis.axis_label = name
-    
+    fig.yaxis.axis_label = name.title()
+
     #- Add hover tool
     hover = HoverTool(renderers = [r], tooltips=tooltips)
     fig.add_tools(hover)
