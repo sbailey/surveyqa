@@ -321,7 +321,7 @@ def makeplots(night, exposures, tiles, outdir):
     
     #- Plot options
     title='Airmass, Seeing, Exptime vs. Time for {}/{}/{}'.format(night[4:6], night[6:], night[:4])
-    TOOLS = ['box_select', 'reset', 'wheel_zoom']
+    TOOLS = ['box_zoom', 'reset', 'wheel_zoom']
     TOOLTIPS = [("EXPID", "@EXPID"), ("Airmass", "@AIRMASS"), ("Seeing", "@SEEING"), 
                 ("Exposure Time", "@EXPTIME"), ("Transparency", "@TRANSP")]
     
