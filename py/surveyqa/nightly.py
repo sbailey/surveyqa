@@ -197,7 +197,6 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
     #- Circles the first point observed on NIGHT
     first = tiles_and_exps[0]
     fig.asterisk(first['RA'], first['DEC'], size=10, line_width=1.5, fill_color=None, color='gold')
-    #fig.circle(first['RA'], first['DEC'], size=10, line_width=1.5, fill_color=None, color='purple')
     
     #- Adds hover tool
     TOOLTIPS = [("(RA, DEC)", "(@RA, @DEC)"), ("EXPID", "@EXPID")]
