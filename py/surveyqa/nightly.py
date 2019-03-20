@@ -334,11 +334,11 @@ def makeplots(night, exposures, tiles, outdir):
     seeing = plot_timeseries(src, 'SEEING', 'navy', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
     exptime = plot_timeseries(src, 'EXPTIME', 'darkorange', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
     transp = plot_timeseries(src, 'TRANSP', 'purple', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
-    
+    brightness = plot_timeseries(src, 'SKY', 'pink', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
+
     #placeholders
     hourangle = hourangle_timeseries(width=600, height=200)
-    brightness = brightness_timeseries(width=600, height=200)
-
+    
     #- Convert these to the components to include in the HTML
     timeseries_script, timeseries_div = components(bk.Column(airmass, seeing, exptime, transp, hourangle, brightness))
 
@@ -360,7 +360,7 @@ def makeplots(night, exposures, tiles, outdir):
     exptimehist = overlaid_hist(all_exposures, exposures, 'EXPTIME', 'darkorange', 400, 200)
     transphist = overlaid_hist(all_exposures, exposures, 'TRANSP', 'purple', 400, 200)
     houranglehist = hourangle_hist(width=400, height=200)
-    brightnesshist = brightness_hist(width=400, height=200)
+    brightnesshist = overlaid_hist(all_exposures, exposures, 'SKY', 'pink', 400, 200)
     
     #adding in the components of the overlaid histograms
     overlaidhists_script, overlaidhists_div = components(bk.Column(airmasshist, seeinghist, exptimehist, transphist, houranglehist, brightnesshist))
