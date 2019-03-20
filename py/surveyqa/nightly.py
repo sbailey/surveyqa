@@ -23,7 +23,7 @@ from datetime import tzinfo
 from datetime import datetime
 from bokeh.models.glyphs import HBar
 from bokeh.models import LabelSet, FactorRange
-from bokeh.palettes import Spectral6, viridis
+from bokeh.palettes import viridis
 from bokeh.transform import factor_cmap, factor_mark, linear_cmap
 from bokeh.models.widgets.tables import DataTable, TableColumn
     
@@ -233,14 +233,15 @@ def get_exptype_counts(exposures, calibs, width=300, height=300):
     types = [('calib', 'ZERO'), ('calib', 'FLAT'), ('calib', 'ARC'),
             ('science', 'BRIGHT'), ('science', 'GRAY'), ('science', 'DARK')]
     counts = np.array([zeroes, flats, arcs, brights, grays, darks])
+    COLORS = ['tan', 'orange', 'yellow', 'green', 'blue', 'red']
 
     src = ColumnDataSource({'types':types, 'counts':counts})
 
     p = bk.figure(width=width, height=height,
                   y_range=FactorRange(*types), title='Exposure Type Counts',
                   toolbar_location=None)
-    p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white',
-           fill_color=factor_cmap('types', palette=Spectral6, factors=types), source=src)
+    p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white', 
+           fill_color=factor_cmap('types', palette=COLORS, factors=types), source=src)
 
 
     labels = LabelSet(x='counts', y='types', text='counts', level='glyph', source=src,
