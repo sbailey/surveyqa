@@ -498,10 +498,18 @@ def get_exposeTimes_hist(exposures, width=500, height=300):
     fig = bk.figure(plot_width=width, plot_height=height, title = "Exposure Times",
                     x_axis_label = "Exposure Time")
 
-    def exptime_dgb(string, color):
-        a = exposures_nocalib[exposures_nocalib["PROGRAM"] == string]
+    def exptime_dgb(program, color):
+        '''
+        Adds a histogram to fig that correspond to the program of the argument with the color provided.
+        The histogram will be exposure time per exposure.
+
+        Args:
+            program: String of the desired program name
+            color: Color of histogram
+        '''
+        a = exposures_nocalib[exposures_nocalib["PROGRAM"] == program]
         hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
-        fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = string)
+        fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
 
     exptime_dgb("DARK", "red")
     exptime_dgb("GRAY", "blue")
@@ -567,15 +575,23 @@ def get_expTimePerTile(exposures, width=250, height=250):
                     x_axis_label = "Total Exposure Time")
 
     def sum_or_first(i):
-        if type(i[0]) is np.str_:
+        if type(i[0]) is str:
             return i[0]
         return np.sum(i)
 
-    def total_exptime_dgb(string, color):
+    def total_exptime_dgb(program, color):
+        '''
+        Adds a histogram to fig that correspond to the program of the argument with the color provided.
+        The histogram will be Total Exposure Time per Tile.
+
+        Args:
+            program: String of the desired program name
+            color: Color of histogram
+        '''
         a = exposures_nocalib.group_by("TILEID").groups.aggregate(sum_or_first)
-        a = a[a["PROGRAM"] == string]
+        a = a[a["PROGRAM"] == program]
         hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
-        fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = string)
+        fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
 
     total_exptime_dgb("DARK", "red")
     total_exptime_dgb("GRAY", "blue")
