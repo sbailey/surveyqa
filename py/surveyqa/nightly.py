@@ -23,7 +23,7 @@ from datetime import tzinfo
 from datetime import datetime
 from bokeh.models.glyphs import HBar
 from bokeh.models import LabelSet, FactorRange
-from bokeh.palettes import Spectral6, viridis
+from bokeh.palettes import viridis
 from bokeh.transform import factor_cmap
 from bokeh.models.widgets.tables import DataTable, TableColumn
     
@@ -206,46 +206,6 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
     return fig
 
 
-def get_exptype_counts(exposures, calibs, width=300, height=300):
-    """
-    Generate a horizontal bar plot showing the counts for each type of
-    exposure grouped by whether they have FLAVOR='science' or PROGRAM='calib'
-
-    ARGS:
-        exposures : a table of exposures which only contain those with FLAVOR='science'
-        calibs : a table of exposures which only contains those with PROGRAm='calibs'
-    """
-    darks = len(exposures[exposures['PROGRAM'] == 'DARK'])
-    grays = len(exposures[exposures['PROGRAM'] == 'GRAY'])
-    brights = len(exposures[exposures['PROGRAM'] == 'BRIGHTS'])
-
-    arcs = len(calibs[calibs['FLAVOR'] == 'arc'])
-    flats = len(calibs[calibs['FLAVOR'] == 'flat'])
-    zeroes = len(calibs[calibs['FLAVOR'] == 'zero'])
-
-    types = [('calib', 'ZERO'), ('calib', 'FLAT'), ('calib', 'ARC'),
-            ('science', 'BRIGHT'), ('science', 'GRAY'), ('science', 'DARK')]
-    counts = np.array([zeroes, flats, arcs, brights, grays, darks])
-
-    src = ColumnDataSource({'types':types, 'counts':counts})
-
-    p = bk.figure(width=width, height=height,
-                  y_range=FactorRange(*types), title='Exposure Type Counts',
-                  toolbar_location=None)
-    p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white',
-           fill_color=factor_cmap('types', palette=Spectral6, factors=types), source=src)
-
-
-    labels = LabelSet(x='counts', y='types', text='counts', level='glyph', source=src,
-                      render_mode='canvas', x_offset=5, y_offset=-7,
-                      text_color='gray', text_font='tahoma', text_font_size='8pt')
-    p.add_layout(labels)
-
-    p.ygrid.grid_line_color=None
-
-    return p
-
-
 def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, height=150):
     """
     Generates an overlaid histogram for a single attribute comparing the distribution 
@@ -327,11 +287,11 @@ def makeplots(night, exposures, tiles, outdir):
     seeing = plot_timeseries(src, 'SEEING', 'navy', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
     exptime = plot_timeseries(src, 'EXPTIME', 'darkorange', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
     transp = plot_timeseries(src, 'TRANSP', 'purple', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
-    
+    brightness = plot_timeseries(src, 'SKY', 'pink', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
+
     #placeholders
     hourangle = hourangle_timeseries(width=600, height=200)
-    brightness = brightness_timeseries(width=600, height=200)
-
+    
     #- Convert these to the components to include in the HTML
     timeseries_script, timeseries_div = components(bk.Column(airmass, seeing, exptime, transp, hourangle, brightness))
 
@@ -353,7 +313,7 @@ def makeplots(night, exposures, tiles, outdir):
     exptimehist = overlaid_hist(all_exposures, exposures, 'EXPTIME', 'darkorange', 400, 200)
     transphist = overlaid_hist(all_exposures, exposures, 'TRANSP', 'purple', 400, 200)
     houranglehist = hourangle_hist(width=400, height=200)
-    brightnesshist = brightness_hist(width=400, height=200)
+    brightnesshist = overlaid_hist(all_exposures, exposures, 'SKY', 'pink', 400, 200)
     
     #adding in the components of the overlaid histograms
     overlaidhists_script, overlaidhists_div = components(bk.Column(airmasshist, seeinghist, exptimehist, transphist, houranglehist, brightnesshist))
@@ -503,9 +463,9 @@ def makeplots(night, exposures, tiles, outdir):
 
 def get_exptype_counts(exposures, calibs, width=300, height=300):
     """
-    Generate a horizontal bar plot showing the counts for each type of exposure grouped 
-    by whether they have FLAVOR='science' or PROGRAM='calib'
-    
+    Generate a horizontal bar plot showing the counts for each type of
+    exposure grouped by whether they have FLAVOR='science' or PROGRAM='calib'
+
     ARGS:
         exposures : a table of exposures which only contain those with FLAVOR='science'
         calibs : a table of exposures which only contains those with PROGRAm='calibs'
@@ -513,31 +473,34 @@ def get_exptype_counts(exposures, calibs, width=300, height=300):
     darks = len(exposures[exposures['PROGRAM'] == 'DARK'])
     grays = len(exposures[exposures['PROGRAM'] == 'GRAY'])
     brights = len(exposures[exposures['PROGRAM'] == 'BRIGHTS'])
-    
+
     arcs = len(calibs[calibs['FLAVOR'] == 'arc'])
     flats = len(calibs[calibs['FLAVOR'] == 'flat'])
     zeroes = len(calibs[calibs['FLAVOR'] == 'zero'])
-    
-    types = [('calib', 'ZERO'), ('calib', 'FLAT'), ('calib', 'ARC'), 
+
+    types = [('calib', 'ZERO'), ('calib', 'FLAT'), ('calib', 'ARC'),
             ('science', 'BRIGHT'), ('science', 'GRAY'), ('science', 'DARK')]
     counts = np.array([zeroes, flats, arcs, brights, grays, darks])
-    
+    COLORS = ['tan', 'orange', 'yellow', 'green', 'blue', 'red']
+
     src = ColumnDataSource({'types':types, 'counts':counts})
-    
+
     p = bk.figure(width=width, height=height,
-                  y_range=FactorRange(*types), title='Exposure Type Counts', 
+                  y_range=FactorRange(*types), title='Exposure Type Counts',
                   toolbar_location=None)
-    p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white',
-           fill_color=factor_cmap('types', palette=Spectral6, factors=types), source=src)
-    
-    
-    labels = LabelSet(x='counts', y='types', text='counts', level='glyph', source=src, 
-                      render_mode='canvas', x_offset=5, y_offset=-10, text_color='gray', text_font='sans-serif')
+    p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white', 
+           fill_color=factor_cmap('types', palette=COLORS, factors=types), source=src)
+
+
+    labels = LabelSet(x='counts', y='types', text='counts', level='glyph', source=src,
+                      render_mode='canvas', x_offset=5, y_offset=-7,
+                      text_color='gray', text_font='tahoma', text_font_size='8pt')
     p.add_layout(labels)
-    
+
     p.ygrid.grid_line_color=None
-    
+
     return p
+
 
 def get_night_link(night, exposures):
     '''Gets the href string for the previous night and the next night for a given nightly page. 

@@ -165,36 +165,15 @@ tzone = TimezoneInfo(utc_offset = -7*u.hour)
 t1 = Time(58821, format='mjd', scale='utc')
 t = t1.to_datetime(timezone=tzone)
 
-# Data Source for the curser-following vertical line on the progress plots
-line_source = ColumnDataSource(data=dict(x=[t]))
-
-# js code is used as the callback for the HoverTool
-js = '''
-/// get mouse data (location of pointer in the plot)
-var geometry = cb_data['geometry'];
-
-/// get the current value of x in line_source
-var data = line_source.data;
-var x = data['x'];
-
-/// if the mouse is indeed hovering over the plot, change the line_source value
-if (isFinite(geometry.x)) {
-  x[0] = geometry.x
-  line_source.change.emit();
-}
-'''
-
-hover_follow = HoverTool(tooltips=None,
-                      point_policy='follow_mouse',
-                      callback=CustomJS(code=js, args={'line_source': line_source}))
-
-def get_surveyprogress(exposures, tiles, width=250, height=250):
+def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, height=250):
     '''
     Generates a plot of survey progress (EXPOSEFAC) vs. time
 
     Args:
         exposures: Table of exposures with columns "PROGRAM", "TILEID", "MJD"
         tiles: Table of tile locations with columns "TILEID", "EXPOSEFAC", "PROGRAM"
+        line_source: line_source for the horizontal gray cursor-tracking line
+        hover_follow: HoverTool object for the horizontal gray cursor-tracking line
 
     Options:
         width, height: plot width and height in pixels
@@ -283,13 +262,15 @@ def get_surveyprogress(exposures, tiles, width=250, height=250):
     fig1.add_tools(hover_follow)
     return fig1
 
-def get_surveyTileprogress(exposures, tiles, width=250, height=250):
+def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=250, height=250):
     '''
     Generates a plot of survey progress (total tiles) vs. time
 
     Args:
         exposures: Table of exposures with columns "PROGRAM", "MJD", "TILEID"
         tiles: Table of tile locations with columns "TILEID", "PROGRAM"
+        line_source: line_source for the horizontal gray cursor-tracking line
+        hover_follow: HoverTool object for the horizontal gray cursor-tracking line
 
     Options:
         width, height: plot width and height in pixels
@@ -409,8 +390,37 @@ def get_linked_progress_plots(exposures, tiles, width=300, height=300):
 
     Returns bokeh Layout object
     '''
-    surveyprogress = get_surveyprogress(exposures, tiles, width=width, height=height)
-    tileprogress = get_surveyTileprogress(exposures, tiles, width=width, height=height)
+
+    # Data Source for the curser-following vertical line on the progress plots
+    first_expose = np.min(exposures['MJD'])
+    startend = np.array([first_expose, first_expose + 365.2422*5])
+    startend_t = Time(startend, format='mjd', scale='utc')
+    startend_t = startend_t.to_datetime(timezone=tzone)
+
+    line_source = ColumnDataSource(data=dict(x=[t], lower=[startend_t[0]], upper=[startend_t[1]]))
+
+    # js code is used as the callback for the HoverTool
+    js = '''
+    /// get mouse data (location of pointer in the plot)
+    var geometry = cb_data['geometry'];
+
+    /// get the current value of x in line_source
+    var data = line_source.data;
+    var x = data['x'];
+
+    /// if the mouse is indeed hovering over the plot, change the line_source value
+    if (isFinite(geometry.x) && (geometry.x >= data['lower'][0]) && (geometry.x <= data['upper'][0])) {
+      x[0] = geometry.x
+      line_source.change.emit();
+    }
+    '''
+
+    hover_follow = HoverTool(tooltips=None,
+                          point_policy='follow_mouse',
+                          callback=CustomJS(code=js, args={'line_source': line_source}))
+
+    surveyprogress = get_surveyprogress(exposures, tiles, line_source, hover_follow, width=width, height=height)
+    tileprogress = get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=width, height=height)
     return gridplot([surveyprogress, tileprogress], ncols=2, plot_width=width, plot_height=height, toolbar_location="right")
 
 def get_hist(exposures, attribute, color, width=250, height=250):
@@ -488,10 +498,18 @@ def get_exposeTimes_hist(exposures, width=500, height=300):
     fig = bk.figure(plot_width=width, plot_height=height, title = "Exposure Times",
                     x_axis_label = "Exposure Time")
 
-    def exptime_dgb(string, color):
-        a = exposures_nocalib[exposures_nocalib["PROGRAM"] == string]
+    def exptime_dgb(program, color):
+        '''
+        Adds a histogram to fig that correspond to the program of the argument with the color provided.
+        The histogram will be exposure time per exposure.
+
+        Args:
+            program: String of the desired program name
+            color: Color of histogram
+        '''
+        a = exposures_nocalib[exposures_nocalib["PROGRAM"] == program]
         hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
-        fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = string)
+        fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
 
     exptime_dgb("DARK", "red")
     exptime_dgb("GRAY", "blue")
@@ -535,68 +553,52 @@ def get_moonplot(exposures, width=250, height=250):
     p.toolbar_location = None
     return p
 
-def _style_as_placeholder(fig):
+def get_expTimePerTile(exposures, width=250, height=250):
     '''
-    Set border, axes, labels to ight gray for placeholder plots
+    Generates three overlaid histogram of the total exposure time per tile for the given
+    exposures table. Each of the histograms correspond to different
+    PROGRAM type: DARK, GREY, BRIGHT
 
-    Note: Modifies visual style of input fig
+    Args:
+        exposures: Table of exposures with columns "PROGRAM", "EXPTIME"
+
+    Options:
+        width, height: plot width and height in pixels
+
+    Returns bokeh Figure object
     '''
-    lightgray = '#cccccc'
-    fig.outline_line_color = lightgray
-    for axis in [fig.xaxis, fig.yaxis]:
-        axis.axis_line_color = lightgray
-        axis.axis_label_text_color = lightgray
-        axis.major_tick_line_color = lightgray
-        axis.minor_tick_line_color = lightgray
-        axis.major_label_text_color = lightgray
+    keep = exposures['PROGRAM'] != 'CALIB'
+    exposures_nocalib = exposures[keep]
+    exposures_nocalib = exposures_nocalib["PROGRAM", "TILEID", "EXPTIME"]
 
-def get_skybrightness(width=250, height=250):
-    """Placeholder graph for sky background brightness plot
-    Options: plot width, height in pixels
-    returns a bokeh figure object"""
-    
-    p = bk.figure(plot_width=width, plot_height=height,
-            x_axis_label="PLACEHOLDER: Sky Brightness")
-    _style_as_placeholder(p)
-    
-    x = np.linspace(0, 10, 20)
-    y = np.random.standard_normal(20)
-    p.circle(x,y, color='#cccccc')
-    p.toolbar_location = None
-    
-    return p
+    fig = bk.figure(plot_width=width, plot_height=height, title = "Total Exposure Time Per Tile Histogram",
+                    x_axis_label = "Total Exposure Time")
 
-def get_hourangle(width=250, height=250):
-    """Placeholder graph for hour angle plot
-    Options: plot width, height in pixels
-    returns a bokeh figure object"""
-    
-    p = bk.figure(plot_width=width, plot_height=height,
-            x_axis_label="PLACEHOLDER: hour angle")
-    _style_as_placeholder(p)
-    
-    x = np.linspace(0, 10, 20)
-    y = np.random.standard_normal(20)
-    p.circle(x,y, color='#cccccc')
-    p.toolbar_location = None
-    
-    return p
+    def sum_or_first(i):
+        if type(i[0]) is str:
+            return i[0]
+        return np.sum(i)
 
-def get_expTimePerTile(width=250, height=250):
-    """Placeholder graph for exposure time summed for each tile plot
-    Options: plot width, height in pixels
-    returns a bokeh figure object"""
-    
-    p = bk.figure(plot_width=width, plot_height=height,
-            x_axis_label="PLACEHOLDER: exptime per tile")
-    _style_as_placeholder(p)
-    
-    x = np.linspace(0, 10, 20)
-    y = np.random.standard_normal(20)
-    p.circle(x,y, color='#cccccc')
-    p.toolbar_location = None
-    
-    return p
+    def total_exptime_dgb(program, color):
+        '''
+        Adds a histogram to fig that correspond to the program of the argument with the color provided.
+        The histogram will be Total Exposure Time per Tile.
+
+        Args:
+            program: String of the desired program name
+            color: Color of histogram
+        '''
+        a = exposures_nocalib.group_by("TILEID").groups.aggregate(sum_or_first)
+        a = a[a["PROGRAM"] == program]
+        hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
+        fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
+
+    total_exptime_dgb("DARK", "red")
+    total_exptime_dgb("GRAY", "blue")
+    total_exptime_dgb("BRIGHT", "green")
+
+    fig.legend.click_policy="hide"
+    return fig
 
 def makeplots(exposures, tiles, outdir):
     '''
@@ -679,7 +681,7 @@ def makeplots(exposures, tiles, outdir):
     <body>
         <div class="flex-container">
             <div class="column side"></div>
-            <div class="column middle"> 
+            <div class="column middle">
                 <div class="header">
                     <p class='sansserif'>DESI Survey QA through {}</p>
         </div>
@@ -700,10 +702,10 @@ def makeplots(exposures, tiles, outdir):
                     <div>{{ seeing_script }} {{ seeing_div }}</div>
                     <div>{{ transp_hist_script }} {{ transp_hist_div }}</div>
                     <div>{{ exposePerTile_hist_script }} {{ exposePerTile_hist_div }}</div>
-                    <div>{{ moonplot_script }} {{ moonplot_div }}</div>
-                    <div>{{ exptime_script }} {{ exptime_div }}</div>
                     <div>{{ brightness_script }} {{ brightness_div }}</div>
                     <div>{{ hourangle_script }} {{ hourangle_div }}</div>
+                    <div>{{ moonplot_script }} {{ moonplot_div }}</div>
+                    <div>{{ exptime_script }} {{ exptime_div }}</div>
                     <div>{{ expTimePerTile_script}} {{ expTimePerTile_div }}</div>
                 </div>
 
@@ -749,14 +751,14 @@ def makeplots(exposures, tiles, outdir):
 
     moonplot = get_moonplot(exposures, 500, 250)
     moonplot_script, moonplot_div = components(moonplot)
-    
-    brightnessplot = get_skybrightness(250, 250)
+
+    brightnessplot = get_hist(exposures, "SKY", "maroon", 250, 250)
     brightness_script, brightness_div = components(brightnessplot)
-    
-    hourangleplot = get_hourangle(250, 250)
+
+    hourangleplot = get_hist(exposures, "HOURANGLE", "magenta", 250, 250)
     hourangle_script, hourangle_div = components(hourangleplot)
-    
-    expTimePerTile_plot = get_expTimePerTile(250, 250)
+
+    expTimePerTile_plot = get_expTimePerTile(exposures, 500, 250)
     expTimePerTile_script, expTimePerTile_div = components(expTimePerTile_plot)
 
     #- Convert to a jinja2.Template object and render HTML
