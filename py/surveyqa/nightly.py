@@ -24,7 +24,7 @@ from datetime import datetime
 from bokeh.models.glyphs import HBar
 from bokeh.models import LabelSet, FactorRange
 from bokeh.palettes import viridis
-from bokeh.transform import factor_cmap, factor_mark, linear_cmap
+from bokeh.transform import factor_cmap
 from bokeh.models.widgets.tables import DataTable, TableColumn
     
 
@@ -168,46 +168,39 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
     tiles_and_exps = join(exposures, tiles['STAR_DENSITY', 'EXPOSEFAC', 'OBSCONDITIONS', 'TILEID'], keys='TILEID')
     tiles_and_exps.sort('TIME')
     
-    #- Create a linear range object for each element of TIME to use for color mapping
-    TIMES = range(len(tiles_and_exps['TIME']))
-
     #- Converts data format into ColumnDataSource
     src = ColumnDataSource(data={'RA':np.array(tiles_and_exps['RA']), 
                                  'DEC':np.array(tiles_and_exps['DEC']), 
                                  'EXPID':np.array(tiles_and_exps['EXPID']),
-                                 'PROGRAM':np.array([str(n) for n in tiles_and_exps['PROGRAM']]),
-                                 'TIME':TIMES})
+                                 'PROGRAM':np.array([str(n) for n in tiles_and_exps['PROGRAM']])})
     
     #- Plot options
-
-    # YEARMMDD -> YEAR-MM-DD 
-    night_name = str(exposures['NIGHT'][0]) # cast to str in case column is int
-    string_date = night_name[:4] + "-" + night_name[4:6] + "-" + night_name[6:]
+    night_name = exposures['NIGHT'][0]
+    string_date = night_name[4:6] + "-" + night_name[6:] + "-" + night_name[:4]
 
     fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
-    fig.yaxis.axis_label = 'Declination'
-    fig.xaxis.axis_label = 'Right Ascension'
+    fig.yaxis.axis_label = 'Declination (degrees)'
+    fig.xaxis.axis_label = 'Right Ascension (degrees)'
 
     #- Plots all tiles
     unobs = fig.circle(tiles['RA'], tiles['DEC'], color='gray', size=1)
     
-    #- Shape-coding for program
+    #- Color-coding for program
     EXPTYPES = ['DARK', 'GRAY', 'BRIGHT']
-    MARKERS = ['hex', 'square', 'triangle']
-    shapes = factor_mark(field_name='PROGRAM', markers=MARKERS, factors=EXPTYPES)
-    
-    #- Color-coding for time of night
-    mapper = linear_cmap(field_name='TIME', palette=viridis(len(TIMES)), low=min(TIMES), high=max(TIMES))
-    
+    COLORS = ['red', 'blue', 'green']
+    mapper = factor_cmap(field_name='PROGRAM', palette=COLORS, factors=EXPTYPES)
+        
     #- Plots tiles observed on NIGHT
-    obs = fig.scatter('RA', 'DEC', size=8, fill_alpha=0.8, legend='PROGRAM', source=src, marker=shapes, color=mapper)
+    obs = fig.scatter('RA', 'DEC', size=5, fill_alpha=0.7, legend='PROGRAM', source=src, color=mapper)
     fig.line(src.data['RA'], src.data['DEC'], color='navy', alpha=0.4)
-
-    #- Adds hover tool, color bar
-    TOOLTIPS = [("(RA, DEC)", "($x, $y)"), ("EXPID", "@EXPID")]
+    
+    #- Circles the first point observed on NIGHT
+    first = tiles_and_exps[0]
+    fig.asterisk(first['RA'], first['DEC'], size=10, line_width=1.5, fill_color=None, color='gold')
+    
+    #- Adds hover tool
+    TOOLTIPS = [("(RA, DEC)", "(@RA, @DEC)"), ("EXPID", "@EXPID")]
     obs_hover = HoverTool(renderers = [obs], tooltips=TOOLTIPS)
-    colorbar = ColorBar(color_mapper=mapper['transform'], width=8,  location=(0,0))
-    fig.add_layout(colorbar, 'right')
     fig.add_tools(obs_hover)
 
     return fig
