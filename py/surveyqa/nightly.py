@@ -26,6 +26,8 @@ from bokeh.models import LabelSet, FactorRange
 from bokeh.palettes import viridis
 from bokeh.transform import factor_cmap
 from bokeh.models.widgets.tables import DataTable, TableColumn
+from astropy import coordinates
+from astropy.coordinates import EarthLocation
     
 
 def find_night(exposures, night):
@@ -151,6 +153,21 @@ def get_nightlytable(exposures):
     return nightly_table
 
 
+def get_moonloc(mjd_midnight):
+    """
+    Returns the location of the moon on the given MJD at midnight
+    
+    Args:
+        mjd_midnight : integer representation of the mjd of a given night at midnight
+    
+    Returns a SkyCoord object    
+    """
+    kitt = EarthLocation.of_site('Kitt Peak National Observatory')
+    t = Time(mjd_midnight, format='mjd', scale='utc', location=kitt)
+    moon_loc = coordinates.get_moon(time=t, location=kitt)
+    return moon_loc
+
+
 def get_skypathplot(exposures, tiles, width=600, height=300):
     """
     Generate a plot which maps the location of tiles observed on NIGHT
@@ -194,9 +211,15 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
     obs = fig.scatter('RA', 'DEC', size=5, fill_alpha=0.7, legend='PROGRAM', source=src, color=mapper)
     fig.line(src.data['RA'], src.data['DEC'], color='navy', alpha=0.4)
     
-    #- Circles the first point observed on NIGHT
+    #- Stars the first point observed on NIGHT
     first = tiles_and_exps[0]
     fig.asterisk(first['RA'], first['DEC'], size=10, line_width=1.5, fill_color=None, color='gold')
+    
+    #- Adds moon location at midnight on NIGHT
+    mjd_midnight = int(exposures['MJD'][0])
+    moon_loc = get_moonloc(mjd_midnight)
+    ra, dec = float(moon_loc.ra.to_string(decimal=True)), float(moon_loc.dec.to_string(decimal=True))
+    fig.circle(ra, dec, size=10, color='black')
     
     #- Adds hover tool
     TOOLTIPS = [("(RA, DEC)", "(@RA, @DEC)"), ("EXPID", "@EXPID")]
