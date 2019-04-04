@@ -163,12 +163,14 @@ def get_moonloc(night):
     #- Re-formats night into YYYY-MM-DD HH:MM:SS 
     iso_format = night[:4] + '-' + night[4:6] + '-' + night[6:] + ' 00:00:00'
     t_midnight = Time(iso_format, format='iso') + 24*u.hour
+    #- Sets timezone
+    t_local = t_midnight + (-7)*u.hour
     
     #- Sets location
     kitt = coordinates.EarthLocation.of_site('Kitt Peak National Observatory')
     
     #- Gets moon coordinates
-    moon_loc = coordinates.get_moon(time=t_midnight, location=kitt)
+    moon_loc = coordinates.get_moon(time=t_local, location=kitt)
     
     return moon_loc
 
