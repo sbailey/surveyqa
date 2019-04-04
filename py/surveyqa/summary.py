@@ -209,6 +209,7 @@ def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, h
         )
 
     fig1 = bk.figure(plot_width=width, plot_height=height, title = "Progress(ExposeFac Weighted) vs Time", x_axis_label = "Time", y_axis_label = "Fraction", x_axis_type="datetime", min_border=min_border)
+    fig1.xaxis.axis_label_text_color = '#ffffff'
     x_d, y_d = bgd("DARK")
     x_g, y_g = bgd("GRAY")
     x_b, y_b = bgd("BRIGHT")
@@ -306,6 +307,7 @@ def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=25
 
     fig = bk.figure(plot_width=width, plot_height=height, title = "# tiles vs time", x_axis_label = "Time",
                     y_axis_label = "# tiles", x_axis_type="datetime", min_border=min_border)
+    fig.xaxis.axis_label_text_color = '#ffffff'
     x_d, y_d = bgd("DARK")
     x_g, y_g = bgd("GRAY")
     x_b, y_b = bgd("BRIGHT")
@@ -421,7 +423,7 @@ def get_linked_progress_plots(exposures, tiles, width=300, height=300, min_borde
 
     surveyprogress = get_surveyprogress(exposures, tiles, line_source, hover_follow, width=width, height=height, min_border=min_border)
     tileprogress = get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=width, height=height, min_border=min_border)
-    return gridplot([surveyprogress, tileprogress], ncols=2, plot_width=width, plot_height=height, toolbar_location="right")
+    return gridplot([surveyprogress, tileprogress], ncols=2, plot_width=width, plot_height=height, toolbar_location='right')
 
 def get_hist(exposures, attribute, color, width=250, height=250, min_border=50):
     '''
@@ -444,15 +446,16 @@ def get_hist(exposures, attribute, color, width=250, height=250, min_border=50):
 
     fig_0 = bk.figure(plot_width=width, plot_height=height,
                     x_axis_label = attribute.title(), min_border=min_border)
-    if attribute == 'TRANSP':
-        fig_0.xaxis.axis_label = 'Transparency'
-    
     fig_0.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5)
     fig_0.toolbar_location = None
+    
+    if attribute == 'TRANSP':
+        fig_0.xaxis.axis_label = 'Transparency'
     
     if attribute != 'HOURANGLE':
         fig_0.yaxis.axis_label = 'Space'
         fig_0.yaxis.axis_label_text_color = '#ffffff'
+        fig_0.axis.axis_label = 'Hour Angle'
         
     return fig_0
 
@@ -738,40 +741,42 @@ def makeplots(exposures, tiles, outdir):
     </html>
     """
 
-    skyplot = get_skyplot(exposures, tiles, 500, 250, 40)
+    min_border = 50
+    
+    skyplot = get_skyplot(exposures, tiles, 500, 300, min_border)
     skyplot_script, skyplot_div = components(skyplot)
 
-    progressplot = get_linked_progress_plots(exposures, tiles, 250, 250, 40)
+    progressplot = get_linked_progress_plots(exposures, tiles, 375, 300, min_border)
     progress_script, progress_div = components(progressplot)
 
     summarytable = get_summarytable(exposures)
     summarytable_script, summarytable_div = components(summarytable)
 
-    seeing_hist = get_hist(exposures, "SEEING", "navy", 250, 250, 40)
+    seeing_hist = get_hist(exposures, "SEEING", "navy", 250, 250, min_border)
     seeing_script, seeing_div = components(seeing_hist)
 
-    airmass_hist = get_hist(exposures, "AIRMASS", "green", 250, 250, 40)
+    airmass_hist = get_hist(exposures, "AIRMASS", "green", 250, 250, min_border)
     airmass_script, airmass_div = components(airmass_hist)
 
-    transp_hist = get_hist(exposures, "TRANSP", "purple", 250, 250, 40)
+    transp_hist = get_hist(exposures, "TRANSP", "purple", 250, 250, min_border)
     transp_hist_script, transp_hist_div = components(transp_hist)
 
-    exposePerTile_hist = get_exposuresPerTile_hist(exposures, "orange", 250, 250, 40)
+    exposePerTile_hist = get_exposuresPerTile_hist(exposures, "orange", 250, 250, min_border)
     exposePerTile_hist_script, exposePerTile_hist_div = components(exposePerTile_hist)
 
-    exptime_hist = get_exposeTimes_hist(exposures, 500, 250, 40)
+    exptime_hist = get_exposeTimes_hist(exposures, 500, 250, min_border)
     exptime_script, exptime_div = components(exptime_hist)
 
-    moonplot = get_moonplot(exposures, 500, 250, 40)
+    moonplot = get_moonplot(exposures, 500, 250, min_border)
     moonplot_script, moonplot_div = components(moonplot)
 
-    brightnessplot = get_hist(exposures, "SKY", "maroon", 250, 250, 40)
+    brightnessplot = get_hist(exposures, "SKY", "maroon", 250, 250, min_border)
     brightness_script, brightness_div = components(brightnessplot)
 
-    hourangleplot = get_hist(exposures, "HOURANGLE", "magenta", 250, 250, 40)
+    hourangleplot = get_hist(exposures, "HOURANGLE", "magenta", 250, 250, min_border)
     hourangle_script, hourangle_div = components(hourangleplot)
 
-    expTimePerTile_plot = get_expTimePerTile(exposures, 500, 250, 40)
+    expTimePerTile_plot = get_expTimePerTile(exposures, 500, 250, min_border)
     expTimePerTile_script, expTimePerTile_div = components(expTimePerTile_plot)
 
     #- Convert to a jinja2.Template object and render HTML
