@@ -27,7 +27,6 @@ from bokeh.palettes import viridis
 from bokeh.transform import factor_cmap
 from bokeh.models.widgets.tables import DataTable, TableColumn
 from astropy import coordinates
-from astropy.coordinates import EarthLocation
     
 
 def find_night(exposures, night):
@@ -153,18 +152,25 @@ def get_nightlytable(exposures):
     return nightly_table
 
 
-def get_moonloc(mjd_midnight):
+def get_moonloc(night):
     """
-    Returns the location of the moon on the given MJD at midnight
+    Returns the location of the moon on the given NIGHT
     
     Args:
-        mjd_midnight : integer representation of the mjd of a given night at midnight
+        night : night = YEARMMDD of sunset
     
-    Returns a SkyCoord object    
+    Returns a SkyCoord object
     """
-    kitt = EarthLocation.of_site('Kitt Peak National Observatory')
-    t = Time(mjd_midnight, format='mjd', scale='utc', location=kitt)
-    moon_loc = coordinates.get_moon(time=t, location=kitt)
+    #- Re-formats night into YYYY-MM-DD HH:MM:SS 
+    iso_format = night[:4] + '-' + night[4:6] + '-' + night[6:] + ' 00:00:00'
+    t_midnight = Time(iso_format, format='iso') + 24*u.hour
+    
+    #- Sets location
+    kitt = coordinates.EarthLocation.of_site('Kitt Peak National Observatory')
+    
+    #- Gets moon coordinates
+    moon_loc = coordinates.get_moon(time=t_midnight, location=kitt)
+    
     return moon_loc
 
 
@@ -213,13 +219,13 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
     
     #- Stars the first point observed on NIGHT
     first = tiles_and_exps[0]
-    fig.asterisk(first['RA'], first['DEC'], size=10, line_width=1.5, fill_color=None, color='gold')
+    fig.asterisk(first['RA'], first['DEC'], size=10, line_width=1.5, fill_color=None, color='aqua')
     
     #- Adds moon location at midnight on NIGHT
-    mjd_midnight = int(exposures['MJD'][0])
-    moon_loc = get_moonloc(mjd_midnight)
+    night = exposures['NIGHT'][0]
+    moon_loc = get_moonloc(night)
     ra, dec = float(moon_loc.ra.to_string(decimal=True)), float(moon_loc.dec.to_string(decimal=True))
-    fig.circle(ra, dec, size=10, color='black')
+    fig.circle(ra, dec, size=10, color='gold')
     
     #- Adds hover tool
     TOOLTIPS = [("(RA, DEC)", "(@RA, @DEC)"), ("EXPID", "@EXPID")]
