@@ -26,7 +26,7 @@ from bokeh.models import LabelSet, FactorRange
 from bokeh.palettes import viridis
 from bokeh.transform import factor_cmap
 from bokeh.models.widgets.tables import DataTable, TableColumn
-
+from astropy import coordinates
 
 def find_night(exposures, night):
     """
@@ -165,6 +165,30 @@ def get_nightlytable(exposures):
     return nightly_table
 
 
+def get_moonloc(night):
+    """
+    Returns the location of the moon on the given NIGHT
+    
+    Args:
+        night : night = YEARMMDD of sunset
+    
+    Returns a SkyCoord object
+    """
+    #- Re-formats night into YYYY-MM-DD HH:MM:SS 
+    iso_format = night[:4] + '-' + night[4:6] + '-' + night[6:] + ' 00:00:00'
+    t_midnight = Time(iso_format, format='iso') + 24*u.hour
+    #- Sets timezone
+    t_local = t_midnight + (-7)*u.hour
+    
+    #- Sets location
+    kitt = coordinates.EarthLocation.of_site('Kitt Peak National Observatory')
+    
+    #- Gets moon coordinates
+    moon_loc = coordinates.get_moon(time=t_local, location=kitt)
+    
+    return moon_loc
+
+
 def get_skypathplot(exposures, tiles, width=600, height=300, min_border_left=50, min_border_right=50):
     """
     Generate a plot which maps the location of tiles observed on NIGHT
@@ -209,6 +233,17 @@ def get_skypathplot(exposures, tiles, width=600, height=300, min_border_left=50,
     #- Plots tiles observed on NIGHT
     obs = fig.scatter('RA', 'DEC', size=5, fill_alpha=0.7, legend='PROGRAM', source=src, color=mapper)
     fig.line(src.data['RA'], src.data['DEC'], color='navy', alpha=0.4)
+    
+    #- Stars the first point observed on NIGHT
+    first = tiles_and_exps[0]
+    fig.asterisk(first['RA'], first['DEC'], size=10, line_width=1.5, fill_color=None, color='orange')
+    
+    #- Adds moon location at midnight on NIGHT
+    night = exposures['NIGHT'][0]
+    moon_loc = get_moonloc(night)
+    ra, dec = float(moon_loc.ra.to_string(decimal=True)), float(moon_loc.dec.to_string(decimal=True))
+    fig.circle(ra, dec, size=10, color='gold')
+    
 
     #- Circles the first point observed on NIGHT
     first = tiles_and_exps[0]
