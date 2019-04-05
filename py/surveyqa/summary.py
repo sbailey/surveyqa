@@ -10,12 +10,17 @@ from bokeh.embed import components
 import bokeh
 import bokeh.plotting as bk
 from bokeh.models import ColumnDataSource, LinearColorMapper, ColorBar, HoverTool, CustomJS, HTMLTemplateFormatter, NumeralTickFormatter
+from bokeh.models.widgets import NumberFormatter
+from bokeh.models.widgets.tables import DataTable, TableColumn
 from bokeh.layouts import gridplot
 from bokeh.transform import transform
 from astropy.time import Time, TimezoneInfo
 from astropy.table import Table, join
 from datetime import datetime, tzinfo
 import astropy.units as u
+
+from collections import Counter, OrderedDict
+
 
 
 def nights_first_observed(exposures, tiles):
@@ -86,24 +91,39 @@ def get_skyplot(exposures, tiles, width=500, height=250, min_border_left=50, min
 
     return fig
 
+def get_median(attribute, exposures):
+    '''Get the median value for a given attribute for all nights for all exposures taken each night.
+    Input: 
+        attributes: one of the labels in the exposure column, string
+        exposures: table with the exposures data
+    Output:
+        returns a numpy array of the median values for each night
+    '''
+    night = exposures['NIGHT']
+    medians = []
+    for n in list(OrderedDict(Counter(night)).keys()):
+        exp_night = exposures[exposures['NIGHT'] == n]
+        attrib = exp_night[attribute]
+        medians.append(np.median(attrib))
+    
+    return np.array(medians)
+
 def get_summarytable(exposures):
     '''
-    Generates a summary table of key values for each night observed. Uses collections.Counter()
+    Generates a summary table of key values for each night observed. Uses collections.Counter(), OrderedDict()
 
     Args:
         exposures: Table of exposures with columns...
 
     Returns a bokeh DataTable object.
     '''
-    from bokeh.models.widgets.tables import DataTable, TableColumn
-    from collections import Counter
-
     night = exposures['NIGHT']
-    night_exps_total = np.array(Counter(night).values())
+    sorted_total = OrderedDict(Counter(night))
+    night_exps_total = np.array(sorted_total.values())
 
     #list of counts of each program for each night
     dct = []
-    for n in list(Counter(exposures['NIGHT']).keys()):
+    for n in list(sorted_total.keys()):
         keep = exposures['NIGHT'] == n
         nights_selected = exposures[keep]
         program_freq = Counter(nights_selected['PROGRAM'])
@@ -121,31 +141,44 @@ def get_summarytable(exposures):
     darks = np.array([counts[i] for i in np.arange(2,len(counts), 4)])
     calibs = np.array([counts[i] for i in np.arange(3,len(counts), 4)])
 
+    med_air = get_median('AIRMASS', exposures)
+    med_seeing = get_median('SEEING', exposures)
+    med_exptime = get_median('EXPTIME', exposures)
+    med_transp = get_median('TRANSP', exposures)
+    med_sky = get_median('SKY', exposures)
+
     source = ColumnDataSource(data=dict(
-        nights = list(Counter(exposures['NIGHT']).keys()),
-        totals = list(Counter(exposures['NIGHT']).values()),
+        nights = list(OrderedDict(Counter(exposures['NIGHT'])).keys()),
+        totals = list(OrderedDict(Counter(exposures['NIGHT'])).values()),
         brights = brights,
         grays = grays,
         darks = darks,
-        calibs = calibs
+        calibs = calibs,
+        med_air = med_air,
+        med_seeing = med_seeing,
+        med_exptime = med_exptime,
+        med_transp = med_transp,
+        med_sky = med_sky,
     ))
 
-    #adds links to nightly pages to the nights column
-    outdir = os.path.join(os.getcwd(), 'survey-qa')
-    os.makedirs(outdir, exist_ok=True)
+    formatter = NumberFormatter(format='0,0.00')
     template_str = '<a href="night-<%= nights %>.html"' + ' target="_blank"><%= value%></a>'
 
     columns = [
-        TableColumn(field='nights', title='NIGHT', formatter=HTMLTemplateFormatter(template=template_str)),
-        TableColumn(field='totals', title='Total Exposures'),
-        TableColumn(field='brights', title='Bright Exposures'),
-        TableColumn(field='grays', title='Gray Exposures'),
-        TableColumn(field='darks', title='Dark Exposures'),
-        TableColumn(field='calibs', title='Calibrations'),
+        TableColumn(field='nights', title='NIGHT', width=100, formatter=HTMLTemplateFormatter(template=template_str)),
+        TableColumn(field='totals', title='Total', width=50),
+        TableColumn(field='brights', title='Bright', width=50),
+        TableColumn(field='grays', title='Gray', width=50),
+        TableColumn(field='darks', title='Dark', width=50),
+        TableColumn(field='calibs', title='Calibs', width=50),
+        TableColumn(field='med_exptime', title='Median Exp. Time', width=100),
+        TableColumn(field='med_air', title='Median Airmass', width=100, formatter=formatter),
+        TableColumn(field='med_seeing', title='Median Seeing', width=100, formatter=formatter),
+        TableColumn(field='med_sky', title='Median Sky', width=100, formatter=formatter),
+        TableColumn(field='med_transp', title='Median Transparency', width=115, formatter=formatter),
     ]
 
-    summary_table = DataTable(source=source, columns=columns, sortable=True)
-
+    summary_table = DataTable(source=source, columns=columns, width=900, sortable=True, fit_columns=False)
     return summary_table
 
 def nights_last_observed(exposures):
