@@ -68,7 +68,7 @@ def get_timeseries(cds, name):
     return x, y
 
 
-def plot_timeseries(source, name, color, tools=None, x_range=None, title=None, tooltips=None, width=400, height=150):
+def plot_timeseries(source, name, color, tools=None, x_range=None, title=None, tooltips=None, width=400, height=150, min_border_left=50, min_border_right=50):
     """
     Plots values corresponding to NAME from SOURCE vs. time with TOOLS
 
@@ -79,10 +79,11 @@ def plot_timeseries(source, name, color, tools=None, x_range=None, title=None, t
         x_range : a range of x values to link multiple plots together
 
     Options:
-        height, width = height and width of the graph in pixels
-        x_range = x-axis range of the graph
-        tools = interactive features
-        title = graph title
+        height, width: height and width of the graph in pixels
+        x_range: x-axis range of the graph
+        tools: interactive features
+        title: graph title
+        min_border_left, min_border_right: set minimum width of surrounding labels (in pixels)
 
     Returns bokeh figure object
     """
@@ -91,7 +92,11 @@ def plot_timeseries(source, name, color, tools=None, x_range=None, title=None, t
 
     fig = bk.figure(width=width, height=height, tools=tools,
                     x_axis_type='datetime', x_range=x_range,
-                    active_scroll='wheel_zoom', title=title)
+                    active_scroll='wheel_zoom', title=title,
+                    x_axis_label='Time',
+                    min_border_left=min_border_left,
+                    min_border_right=min_border_right)
+    fig.xaxis.axis_label_text_color='#ffffff'
     fig.line('TIME', name, source=source)
     r = fig.circle('TIME', name, line_color=color, fill_color='white',
                    size=6, line_width=2, hover_color='firebrick', source=source)
@@ -108,15 +113,24 @@ def plot_timeseries(source, name, color, tools=None, x_range=None, title=None, t
 
     return fig
 
-def hourangle_timeseries(width=600, height=200):
+def hourangle_timeseries(width=600, height=200, min_border_left=50, min_border_right=50):
     '''Placeholder for a hour angle vs. time plot'''
-    p = bk.figure(plot_width=width, plot_height=height, y_axis_label='Hour Angle')
+    p = bk.figure(plot_width=width, plot_height=height,
+                  x_axis_label='Time',
+                  y_axis_label='Hour Angle', min_border_left=min_border_left, 
+                  min_border_right=min_border_right)
+    p.xaxis.axis_label_text_color='#ffffff'
     p.toolbar_location = None
     return p
 
-def brightness_timeseries(width=600, height=200):
+def brightness_timeseries(width=600, height=200, min_border_left=50, min_border_right=50):
     '''Placeholder for a sky brightness timeseries plot'''
-    p = bk.figure(plot_width=width, plot_height=height, y_axis_label='Sky Brightness')
+    p = bk.figure(plot_width=width, plot_height=height, 
+                  x_axis_label='Time',
+                  y_axis_label='Sky Brightness', 
+                  min_border_left=min_border_left,
+                  min_border_right=min_border_right)
+    p.xaxis.axis_label_text_color='#ffffff'
     p.toolbar_location = None
     return p
 
@@ -175,7 +189,7 @@ def get_moonloc(night):
     return moon_loc
 
 
-def get_skypathplot(exposures, tiles, width=600, height=300):
+def get_skypathplot(exposures, tiles, width=600, height=300, min_border_left=50, min_border_right=50):
     """
     Generate a plot which maps the location of tiles observed on NIGHT
 
@@ -184,7 +198,8 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
         tiles: Table of tile locations with columns ...
 
     Options:
-        height, width = height and width of the graph in pixels
+        height, width: height and width of the graph in pixels
+        min_border_left, min_border_right: set minimum width of surrounding labels (in pixels)
 
     Returns a bokeh figure object
     """
@@ -202,7 +217,8 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
     night_name = exposures['NIGHT'][0]
     string_date = night_name[4:6] + "-" + night_name[6:] + "-" + night_name[:4]
 
-    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date)
+    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date, 
+                    min_border_left=min_border_left, min_border_right=min_border_right)
     fig.yaxis.axis_label = 'Declination (degrees)'
     fig.xaxis.axis_label = 'Right Ascension (degrees)'
 
@@ -241,7 +257,7 @@ def get_skypathplot(exposures, tiles, width=600, height=300):
     return fig
 
 
-def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, height=150):
+def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, height=150, min_border_left=50, min_border_right=50):
     """
     Generates an overlaid histogram for a single attribute comparing the distribution
     for all of the exposures vs. those from just one night
@@ -252,7 +268,8 @@ def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, h
         attribute : a string name of a column in the exposures tables
         color : color of histogram
     Options:
-        height, width = height and width of the graph in pixels
+        height, width: height and width of the graph in pixels
+        min_border_left, min_border_right: set minimum width of surrounding labels (in pixels)
 
     Returns a bokeh figure object
     """
@@ -260,7 +277,7 @@ def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, h
     hist_night, edges_night = np.histogram(np.array(night_exposures[attribute]), density=True, bins=50)
 
     fig = bk.figure(plot_width=width, plot_height=height, # title = attribute + " Histogram",
-                    x_axis_label = attribute.title())
+                    x_axis_label = attribute.title(), min_border_left=min_border_left, min_border_right=min_border_right)
     fig.quad(top=hist_all, bottom=0, left=edges_all[:-1], right=edges_all[1:], fill_color=color, alpha=0.2)
     fig.quad(top=hist_night, bottom=0, left=edges_night[:-1], right=edges_night[1:], fill_color=color, alpha=0.6)
 
@@ -296,7 +313,7 @@ def makeplots(night, exposures, tiles, outdir):
     calibs = find_night(all_calibs, night)
 
     #- Plot options
-    title='Airmass, Seeing, Exptime vs. Time for {}/{}/{}'.format(night[4:6], night[6:], night[:4])
+    #title='Airmass, Seeing, Exptime vs. Time for {}/{}/{}'.format(night[4:6], night[6:], night[:4])
     TOOLS = ['box_zoom', 'reset', 'wheel_zoom']
     TOOLTIPS = [("EXPID", "@EXPID"), ("Airmass", "@AIRMASS"), ("Seeing", "@SEEING"),
                 ("Exposure Time", "@EXPTIME"), ("Transparency", "@TRANSP"), ("HOURANGLE", "@HOURANGLE")]
@@ -306,12 +323,13 @@ def makeplots(night, exposures, tiles, outdir):
     src = ColumnDataSource(data={c:np.array(exposures[c]) for c in COLS})
 
     #- Get timeseries plots for several variables
-    airmass = plot_timeseries(src, 'AIRMASS', 'green', tools=TOOLS, x_range=None, title=title, tooltips=TOOLTIPS, width=600, height=200)
-    seeing = plot_timeseries(src, 'SEEING', 'navy', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
-    exptime = plot_timeseries(src, 'EXPTIME', 'darkorange', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
-    transp = plot_timeseries(src, 'TRANSP', 'purple', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
-    hourangle = plot_timeseries(src, 'HOURANGLE', 'maroon', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
-    brightness = plot_timeseries(src, 'SKY', 'pink', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=200)
+    min_border = 50
+    airmass = plot_timeseries(src, 'AIRMASS', 'green', tools=TOOLS, x_range=None, title=None, tooltips=TOOLTIPS, width=600, height=250, min_border_left=min_border, min_border_right=min_border)
+    seeing = plot_timeseries(src, 'SEEING', 'navy', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=250, min_border_left=min_border, min_border_right=min_border)
+    exptime = plot_timeseries(src, 'EXPTIME', 'darkorange', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=250, min_border_left=min_border, min_border_right=min_border)
+    transp = plot_timeseries(src, 'TRANSP', 'purple', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=250, min_border_left=min_border, min_border_right=min_border)
+    hourangle = plot_timeseries(src, 'HOURANGLE', 'maroon', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=250, min_border_left=min_border, min_border_right=min_border)
+    brightness = plot_timeseries(src, 'SKY', 'pink', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=250, min_border_left=min_border, min_border_right=min_border)
 
     #- Convert these to the components to include in the HTML
     timeseries_script, timeseries_div = components(bk.Column(airmass, seeing, exptime, transp, hourangle, brightness))
@@ -321,20 +339,20 @@ def makeplots(night, exposures, tiles, outdir):
     table_script, table_div = components(nightlytable)
 
     #adding in the skyplot components
-    skypathplot = get_skypathplot(exposures, tiles, width=600, height=300)
+    skypathplot = get_skypathplot(exposures, tiles, width=600, height=300, min_border_left=min_border, min_border_right=min_border)
     skypathplot_script, skypathplot_div = components(skypathplot)
 
     #adding in the components of the exposure types bar plot
-    exptypecounts = get_exptype_counts(exposures, calibs, width=400, height=300)
+    exptypecounts = get_exptype_counts(exposures, calibs, width=400, height=300, min_border_left=min_border, min_border_right=min_border)
     exptypecounts_script, exptypecounts_div = components(exptypecounts)
 
     #- Get overlaid histograms for several variables
-    airmasshist = overlaid_hist(all_exposures, exposures, 'AIRMASS', 'green', 400, 200)
-    seeinghist = overlaid_hist(all_exposures, exposures, 'SEEING', 'navy', 400, 200)
-    exptimehist = overlaid_hist(all_exposures, exposures, 'EXPTIME', 'darkorange', 400, 200)
-    transphist = overlaid_hist(all_exposures, exposures, 'TRANSP', 'purple', 400, 200)
-    houranglehist = overlaid_hist(all_exposures, exposures, 'HOURANGLE', 'maroon', 400, 200)
-    brightnesshist = overlaid_hist(all_exposures, exposures, 'SKY', 'pink', 400, 200)
+    airmasshist = overlaid_hist(all_exposures, exposures, 'AIRMASS', 'green', 400, 250, min_border_left=min_border, min_border_right=min_border)
+    seeinghist = overlaid_hist(all_exposures, exposures, 'SEEING', 'navy', 400, 250, min_border_left=min_border, min_border_right=min_border)
+    exptimehist = overlaid_hist(all_exposures, exposures, 'EXPTIME', 'darkorange', 400, 250, min_border_left=min_border, min_border_right=min_border)
+    transphist = overlaid_hist(all_exposures, exposures, 'TRANSP', 'purple', 400, 250, min_border_left=min_border, min_border_right=min_border)
+    houranglehist = overlaid_hist(all_exposures, exposures, 'HOURANGLE', 'maroon', 400, 250, min_border_left=min_border, min_border_right=min_border)
+    brightnesshist = overlaid_hist(all_exposures, exposures, 'SKY', 'pink', 400, 250, min_border_left=min_border, min_border_right=min_border)
 
     #adding in the components of the overlaid histograms
     overlaidhists_script, overlaidhists_div = components(bk.Column(airmasshist, seeinghist, exptimehist, transphist, houranglehist, brightnesshist))
@@ -387,11 +405,11 @@ def makeplots(night, exposures, tiles, outdir):
     }
 
     .column.side {
-        width = 10%;
+        width = 5%;
     }
 
     .column.middle {
-        width = 80%;
+        width = 90%;
     }
 
     .flex-container {
@@ -437,13 +455,13 @@ def makeplots(night, exposures, tiles, outdir):
     <body>
         <ul>
           <li style="float:left"><a>DESI Survey QA Night {}</a></li>
-          <li><a href={}>First</a></li>
-          <li><a href={}>Previous</a></li>
-          <li><a href={}>Summary Page</a></li>
-          <li><a href={}>Next</a></li>
           <li><a href={}>Last</a></li>
+          <li><a href={}>Next</a></li>
+          <li><a href={}>Summary Page</a></li>
+          <li><a href={}>Previous</a></li>
+          <li><a href={}>First</a></li>
         </ul>
-    """.format(night, first_str, prev_str, summary_str, next_str, last_str)
+    """.format(night, last_str, next_str, summary_str, prev_str, first_str)
 
     template += """
         <div class="flex-container">
@@ -482,7 +500,7 @@ def makeplots(night, exposures, tiles, outdir):
 
     print('Wrote {}'.format(outfile))
 
-def get_exptype_counts(exposures, calibs, width=300, height=300):
+def get_exptype_counts(exposures, calibs, width=300, height=300, min_border_left=50, min_border_right=50):
     """
     Generate a horizontal bar plot showing the counts for each type of
     exposure grouped by whether they have FLAVOR='science' or PROGRAM='calib'
@@ -490,10 +508,13 @@ def get_exptype_counts(exposures, calibs, width=300, height=300):
     ARGS:
         exposures : a table of exposures which only contain those with FLAVOR='science'
         calibs : a table of exposures which only contains those with PROGRAm='calibs'
+    Options:
+        height, width: height and width in pixels
+        min_border_left, min_border_right = set minimum width of surrounding labels (in pixels)
     """
     darks = len(exposures[exposures['PROGRAM'] == 'DARK'])
     grays = len(exposures[exposures['PROGRAM'] == 'GRAY'])
-    brights = len(exposures[exposures['PROGRAM'] == 'BRIGHTS'])
+    brights = len(exposures[exposures['PROGRAM'] == 'BRIGHT'])
 
     arcs = len(calibs[calibs['FLAVOR'] == 'arc'])
     flats = len(calibs[calibs['FLAVOR'] == 'flat'])
@@ -508,7 +529,7 @@ def get_exptype_counts(exposures, calibs, width=300, height=300):
 
     p = bk.figure(width=width, height=height,
                   y_range=FactorRange(*types), title='Exposure Type Counts',
-                  toolbar_location=None)
+                  toolbar_location=None, min_border_left=min_border_left, min_border_right=min_border_right)
     p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white',
            fill_color=factor_cmap('types', palette=COLORS, factors=types), source=src)
 
