@@ -21,7 +21,10 @@ import astropy.units as u
 
 from collections import Counter, OrderedDict
 
-
+#- Avoid warnings from date & coord calculations in the future
+import warnings
+warnings.filterwarnings('ignore', 'ERFA function.*dubious year.*')
+warnings.filterwarnings('ignore', 'Tried to get polar motions for times after IERS data is valid.*')
 
 def nights_first_observed(exposures, tiles):
     '''
@@ -104,7 +107,7 @@ def get_median(attribute, exposures):
     for n in list(OrderedDict(Counter(night)).keys()):
         exp_night = exposures[exposures['NIGHT'] == n]
         attrib = exp_night[attribute]
-        medians.append(np.median(attrib))
+        medians.append(np.ma.median(attrib))  #- use masked median
     
     return np.array(medians)
 
