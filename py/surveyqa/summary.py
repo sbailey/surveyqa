@@ -140,9 +140,8 @@ def get_median(attribute, exposures):
     Output:
         returns a numpy array of the median values for each night
     '''
-    night = exposures['NIGHT']
     medians = []
-    for n in list(OrderedDict(Counter(night)).keys()):
+    for n in np.unique(exposures['NIGHT']):
         # exp_night = exposures[exposures['NIGHT'] == n]
         # attrib = exp_night[attribute]
         ii = (exposures['NIGHT'] == n)
@@ -160,45 +159,26 @@ def get_summarytable(exposures):
 
     Returns a bokeh DataTable object.
     '''
-    night = exposures['NIGHT']
-    sorted_total = OrderedDict(Counter(night))
-    night_exps_total = np.array(sorted_total.values())
-
-    #list of counts of each program for each night
-    # dct = []
-    # for n in list(sorted_total.keys()):
-    #     keep = exposures['NIGHT'] == n
-    #     nights_selected = exposures[keep]
-    #     program_freq = Counter(nights_selected['PROGRAM'])
-    #     dct.append(program_freq)
-    #
-    # #get the values out of the dictionaries above (in a specified order so we can splice later)
-    # counts = []
-    # for d in dct:
-    #     for key in ['BRIGHT', 'GRAY', 'DARK', 'CALIB']:
-    #         counts.append(d[key])
-    #
-    # #lists of counts of each program for each night
-    # brights = np.array([counts[i] for i in np.arange(0,len(counts), 4)])
-    # grays = np.array([counts[i] for i in np.arange(1,len(counts), 4)])
-    # darks = np.array([counts[i] for i in np.arange(2,len(counts), 4)])
-    # calibs = np.array([counts[i] for i in np.arange(3,len(counts), 4)])
+    nights = np.unique(exposures['NIGHT'])
 
     isbright = (exposures['PROGRAM'] == 'BRIGHT')
     isgray = (exposures['PROGRAM'] == 'GRAY')
     isdark = (exposures['PROGRAM'] == 'DARK')
     iscalib = (exposures['PROGRAM'] == 'CALIB')
 
-    brights = np.zeros(len(sorted_total))
-    grays = np.zeros(len(sorted_total))
-    darks = np.zeros(len(sorted_total))
-    calibs = np.zeros(len(sorted_total))
-    for i, n in enumerate(sorted_total.keys()):
+    num_nights = len(nights)
+    brights = list()
+    grays = list()
+    darks = list()
+    calibs = list()
+    totals = list()
+    for n in nights:
         thisnight = exposures['NIGHT'] == n
-        brights[i] = np.count_nonzero(thisnight & isbright)
-        grays[i] = np.count_nonzero(thisnight & isgray)
-        darks[i] = np.count_nonzero(thisnight & isdark)
-        calibs[i] = np.count_nonzero(thisnight & iscalib)
+        totals.append(np.count_nonzero(thisnight))
+        brights.append(np.count_nonzero(thisnight & isbright))
+        grays.append(np.count_nonzero(thisnight & isgray))
+        darks.append(np.count_nonzero(thisnight & isdark))
+        calibs.append(np.count_nonzero(thisnight & iscalib))
 
     med_air = get_median('AIRMASS', exposures)
     med_seeing = get_median('SEEING', exposures)
@@ -207,8 +187,8 @@ def get_summarytable(exposures):
     med_sky = get_median('SKY', exposures)
 
     source = ColumnDataSource(data=dict(
-        nights = list(OrderedDict(Counter(exposures['NIGHT'])).keys()),
-        totals = list(OrderedDict(Counter(exposures['NIGHT'])).values()),
+        nights = list(nights),
+        totals = totals,
         brights = brights,
         grays = grays,
         darks = darks,
