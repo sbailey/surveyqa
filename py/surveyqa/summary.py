@@ -143,8 +143,10 @@ def get_median(attribute, exposures):
     night = exposures['NIGHT']
     medians = []
     for n in list(OrderedDict(Counter(night)).keys()):
-        exp_night = exposures[exposures['NIGHT'] == n]
-        attrib = exp_night[attribute]
+        # exp_night = exposures[exposures['NIGHT'] == n]
+        # attrib = exp_night[attribute]
+        ii = (exposures['NIGHT'] == n)
+        attrib = np.asarray(exposures[attribute])[ii]
         medians.append(np.ma.median(attrib))  #- use masked median
 
     return np.array(medians)
@@ -163,24 +165,40 @@ def get_summarytable(exposures):
     night_exps_total = np.array(sorted_total.values())
 
     #list of counts of each program for each night
-    dct = []
-    for n in list(sorted_total.keys()):
-        keep = exposures['NIGHT'] == n
-        nights_selected = exposures[keep]
-        program_freq = Counter(nights_selected['PROGRAM'])
-        dct.append(program_freq)
+    # dct = []
+    # for n in list(sorted_total.keys()):
+    #     keep = exposures['NIGHT'] == n
+    #     nights_selected = exposures[keep]
+    #     program_freq = Counter(nights_selected['PROGRAM'])
+    #     dct.append(program_freq)
+    #
+    # #get the values out of the dictionaries above (in a specified order so we can splice later)
+    # counts = []
+    # for d in dct:
+    #     for key in ['BRIGHT', 'GRAY', 'DARK', 'CALIB']:
+    #         counts.append(d[key])
+    #
+    # #lists of counts of each program for each night
+    # brights = np.array([counts[i] for i in np.arange(0,len(counts), 4)])
+    # grays = np.array([counts[i] for i in np.arange(1,len(counts), 4)])
+    # darks = np.array([counts[i] for i in np.arange(2,len(counts), 4)])
+    # calibs = np.array([counts[i] for i in np.arange(3,len(counts), 4)])
 
-    #get the values out of the dictionaries above (in a specified order so we can splice later)
-    counts = []
-    for d in dct:
-        for key in ['BRIGHT', 'GRAY', 'DARK', 'CALIB']:
-            counts.append(d[key])
+    isbright = (exposures['PROGRAM'] == 'BRIGHT')
+    isgray = (exposures['PROGRAM'] == 'GRAY')
+    isdark = (exposures['PROGRAM'] == 'DARK')
+    iscalib = (exposures['PROGRAM'] == 'CALIB')
 
-    #lists of counts of each program for each night
-    brights = np.array([counts[i] for i in np.arange(0,len(counts), 4)])
-    grays = np.array([counts[i] for i in np.arange(1,len(counts), 4)])
-    darks = np.array([counts[i] for i in np.arange(2,len(counts), 4)])
-    calibs = np.array([counts[i] for i in np.arange(3,len(counts), 4)])
+    brights = np.zeros(len(sorted_total))
+    grays = np.zeros(len(sorted_total))
+    darks = np.zeros(len(sorted_total))
+    calibs = np.zeros(len(sorted_total))
+    for i, n in enumerate(sorted_total.keys()):
+        thisnight = exposures['NIGHT'] == n
+        brights[i] = np.count_nonzero(thisnight & isbright)
+        grays[i] = np.count_nonzero(thisnight & isgray)
+        darks[i] = np.count_nonzero(thisnight & isdark)
+        calibs[i] = np.count_nonzero(thisnight & iscalib)
 
     med_air = get_median('AIRMASS', exposures)
     med_seeing = get_median('SEEING', exposures)
@@ -715,11 +733,11 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
             program: String of the desired program name
             color: Color of histogram
         '''
-        a = exposures_nocalib.group_by("TILEID").groups.aggregate(sum_or_first)
-        w = a["PROGRAM"] == program
-        if not any(w):
-            return
-        a = a[w]
+        # a = exposures_nocalib.group_by("TILEID").groups.aggregate(sum_or_first)
+        # a = a[a["PROGRAM"] == program]
+        thisprogram = (exposures_nocalib["PROGRAM"] == program)
+        a = exposures_nocalib["TILEID", "EXPTIME"][thisprogram].group_by("TILEID").groups.aggregate(np.sum)
+
         hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
         fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
 
