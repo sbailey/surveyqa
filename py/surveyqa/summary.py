@@ -234,7 +234,8 @@ def nights_last_observed(exposures):
         return arr[len(arr)-1]
     return exposures.group_by("TILEID").groups.aggregate(last)
 
-tzone = TimezoneInfo(utc_offset = -7*u.hour)
+utc_offset = -7*u.hour
+tzone = TimezoneInfo(utc_offset = utc_offset)
 t1 = Time(58821, format='mjd', scale='utc')
 t = t1.to_datetime(timezone=tzone)
 
@@ -265,7 +266,9 @@ def get_progress(exposures, tiles, program):
 
     #- Convert MJD to list of datetimes for bokeh
     t1 = Time(finished_tiles['MJD'], format='mjd', scale='utc')
-    t = t1.to_datetime(timezone=tzone)
+    # t = t1.to_datetime(timezone=tzone)
+    # local non-timezone aware time, instead of much slower timezone aware
+    t = (t1 + utc_offset).to_datetime()
 
     #- Tile progress is just counting tiles
     tile_progress = np.arange(len(t))
