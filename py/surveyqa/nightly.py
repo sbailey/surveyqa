@@ -457,12 +457,12 @@ def makeplots(night, exposures, tiles, outdir):
           <li style="float:left"><a>DESI Survey QA Night {}</a></li>
           <li><a href={}>Last</a></li>
           <li><a href={}>Next</a></li>
-          <li><a href={}>Summary Page</a></li>
           <li><a href={}>Previous</a></li>
           <li><a href={}>First</a></li>
+          <li><a href={}>Summary Page</a></li>
         </ul>
-    """.format(night, last_str, next_str, summary_str, prev_str, first_str)
-
+    """.format(night, last_str, next_str, prev_str, first_str, summary_str)
+    
     template += """
         <div class="flex-container">
                 <div class="column middle">
