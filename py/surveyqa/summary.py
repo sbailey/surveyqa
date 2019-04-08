@@ -16,7 +16,7 @@ from bokeh.layouts import gridplot
 from bokeh.transform import transform
 from astropy.time import Time, TimezoneInfo
 from astropy.table import Table, join
-from datetime import datetime, tzinfo
+from datetime import datetime, tzinfo, timedelta
 import astropy.units as u
 from collections import Counter, OrderedDict
 
@@ -238,13 +238,53 @@ tzone = TimezoneInfo(utc_offset = -7*u.hour)
 t1 = Time(58821, format='mjd', scale='utc')
 t = t1.to_datetime(timezone=tzone)
 
-def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, height=250, min_border_left=50, min_border_right=50):
+def get_progress(exposures, tiles, program):
+    '''Get survey and tile progress for a given program
+
+    Args:
+        exposures: Table with columns PROGRAM, TILEID, MJD
+        tiles: Table with columns TILEID, EXPOSEFAC
+        program: str program name to filter
+
+    Returns (time, survey_progress, tile_progress)
+
+    time = array of datetime objects;
+    survey_progress = array of EXPOSEFAC-weighted progress on observing tiles;
+    tile_progress = array of number of tiles observed
+    '''
+
+    keep = exposures['PROGRAM'] == program
+    exposures = exposures['TILEID', 'MJD'][keep]
+    keep = tiles['PROGRAM'] == program
+    tiles = tiles['TILEID', 'EXPOSEFAC'][keep]
+
+    #- Create table of last exposure for each tile, sorted by MJD
+    finished_tiles = exposures.group_by('TILEID').groups.aggregate(np.max)
+    finished_tiles = join(finished_tiles, tiles, keys='TILEID', join_type='left')
+    finished_tiles.sort('MJD')
+
+    #- Convert MJD to list of datetimes for bokeh
+    t1 = Time(finished_tiles['MJD'], format='mjd', scale='utc')
+    t = t1.to_datetime(timezone=tzone)
+
+    #- Tile progress is just counting tiles
+    tile_progress = np.arange(len(t))
+
+    #- Survey progress is weighted by EXPOSEFAC
+    survey_progress = np.cumsum(finished_tiles['EXPOSEFAC']) / np.sum(tiles['EXPOSEFAC'])
+
+    return t, tile_progress, survey_progress
+
+
+def get_surveyprogress_plot(progress, line_source, hover_follow, width=250, height=250, min_border_left=50, min_border_right=50):
     '''
     Generates a plot of survey progress (EXPOSEFAC) vs. time
 
+    TODO: update docs for what "progress" is
+
     Args:
-        exposures: Table of exposures with columns "PROGRAM", "TILEID", "MJD"
-        tiles: Table of tile locations with columns "TILEID", "EXPOSEFAC", "PROGRAM"
+        progress: dict keyed by DARK, GRAY, BRIGHT, with values 
+            (time, survey_progress, tile_progress) from get_progress    
         line_source: line_source for the horizontal gray cursor-tracking line
         hover_follow: HoverTool object for the horizontal gray cursor-tracking line
 
@@ -254,28 +294,6 @@ def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, h
 
     Returns bokeh Figure object
     '''
-    keep = exposures['PROGRAM'] != 'CALIB'
-    exposures_nocalib = exposures[keep]
-
-    tne = join(nights_last_observed(exposures_nocalib["TILEID", "MJD"]), tiles, keys="TILEID", join_type='inner')
-    tne.sort('MJD')
-
-    def bgd(string):
-        w = tne["PROGRAM"] == string
-        if not any(w):
-            return ([], [])
-        tne_d = tne[w]
-        x_d = np.array(tne_d['MJD'])
-        y_d1 = np.array(tne_d['EXPOSEFAC'])
-        s = 0
-        y_d = np.array([])
-        for i in y_d1:
-            s += i
-            y_d = np.append(y_d, s)
-        y_d = y_d/np.sum(tiles[tiles["PROGRAM"] == string]["EXPOSEFAC"])
-        t1 = Time(x_d, format='mjd', scale='utc')
-        t = t1.to_datetime(timezone=tzone)
-        return (t, y_d)
 
     hover = HoverTool(
             names=["D", "G", "B"],
@@ -285,11 +303,11 @@ def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, h
             ]
         )
 
-    fig1 = bk.figure(plot_width=width, plot_height=height, title = "Progress(ExposeFac Weighted) vs Time", x_axis_label = "Time", y_axis_label = "Fraction", x_axis_type="datetime", min_border_left=min_border_left, min_border_right=min_border_right)
+    fig1 = bk.figure(plot_width=width, plot_height=height, title = "Survey progress", x_axis_label = "Time", y_axis_label = "Fraction", x_axis_type="datetime", min_border_left=min_border_left, min_border_right=min_border_right)
     fig1.xaxis.axis_label_text_color = '#ffffff'
-    x_d, y_d = bgd("DARK")
-    x_g, y_g = bgd("GRAY")
-    x_b, y_b = bgd("BRIGHT")
+    x_d, tmp, y_d = progress["DARK"]
+    x_g, tmp, y_g = progress["GRAY"]
+    x_b, tmp, y_b = progress["BRIGHT"]
 
     source_d = ColumnDataSource(
             data=dict(
@@ -313,14 +331,13 @@ def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, h
             )
         )
 
-    startend = np.array([np.min(tne['MJD']), np.min(tne['MJD']) + 365.2422*5])
-    t1 = Time(startend, format='mjd', scale='utc')
-    t = t1.to_datetime(timezone=tzone)
+    tstart = min(x_d[0], x_g[0], x_b[0])
+    tend = tstart + timedelta(365.2422*5)
     source_line = ColumnDataSource(
             data=dict(
-                x=t,
+                x=[tstart, tend],
                 y=[0, 1],
-                date=[t1.strftime("%a, %d %b %Y %H:%M") for t1 in t],
+                date=[t1.strftime("%a, %d %b %Y %H:%M") for t1 in [tstart, tend]],
             )
         )
 
@@ -343,12 +360,13 @@ def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, h
     fig1.add_tools(hover_follow)
     return fig1
 
-def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=250, height=250, min_border_left=50, min_border_right=50):
+def get_tileprogress_plot(progress, tiles, line_source, hover_follow, width=250, height=250, min_border_left=50, min_border_right=50):
     '''
     Generates a plot of survey progress (total tiles) vs. time
 
     Args:
-        exposures: Table of exposures with columns "PROGRAM", "MJD", "TILEID"
+        progress: dict keyed by DARK, GRAY, BRIGHT, with values 
+            (time, survey_progress, tile_progress) from get_progress    
         tiles: Table of tile locations with columns "TILEID", "PROGRAM"
         line_source: line_source for the horizontal gray cursor-tracking line
         hover_follow: HoverTool object for the horizontal gray cursor-tracking line
@@ -359,29 +377,6 @@ def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=25
 
     Returns bokeh Figure object
     '''
-    keep = exposures['PROGRAM'] != 'CALIB'
-    exposures_nocalib = exposures[keep]
-    exposures_nocalib = nights_last_observed(exposures_nocalib["TILEID", "MJD", "PROGRAM"])
-    exposures_nocalib.sort('MJD')
-
-    tzone = TimezoneInfo(utc_offset = -7*u.hour)
-
-    def bgd(string):
-        w = exposures_nocalib["PROGRAM"] == string
-        if not any(w):
-            return ([], [])
-        tne_d = exposures_nocalib[w]
-        x_d = np.array(tne_d['MJD'])
-        s = 0
-        y_d = np.array([])
-        for i in x_d:
-            s += 1
-            y_d = np.append(y_d, s)
-        if x_d == []:
-            return ([], [])
-        t1 = Time(x_d, format='mjd', scale='utc')
-        t = t1.to_datetime(timezone=tzone)
-        return (t, y_d)
 
     hover = HoverTool(
             names=["G", "D", "B"],
@@ -394,9 +389,9 @@ def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=25
     fig = bk.figure(plot_width=width, plot_height=height, title = "# tiles vs time", x_axis_label = "Time",
                     y_axis_label = "# tiles", x_axis_type="datetime", min_border_left=min_border_left, min_border_right=min_border_right)
     fig.xaxis.axis_label_text_color = '#ffffff'
-    x_d, y_d = bgd("DARK")
-    x_g, y_g = bgd("GRAY")
-    x_b, y_b = bgd("BRIGHT")
+    x_d, y_d, tmp = progress["DARK"]
+    x_g, y_g, tmp = progress["GRAY"]
+    x_b, y_b, tmp = progress["BRIGHT"]
 
     source_d = ColumnDataSource(
             data=dict(
@@ -420,9 +415,9 @@ def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=25
             )
         )
 
-    startend = np.array([np.min(exposures_nocalib['MJD']), np.min(exposures_nocalib['MJD']) + 365.2422*5])
-    t1 = Time(startend, format='mjd', scale='utc')
-    t = t1.to_datetime(timezone=tzone)
+    tstart = min(x_d[0], x_g[0], x_b[0])
+    tend = tstart + timedelta(365.2422*5)
+    t = [tstart, tend]
     source_line_d = ColumnDataSource(
             data=dict(
                 x=t,
@@ -511,8 +506,12 @@ def get_linked_progress_plots(exposures, tiles, width=300, height=300, min_borde
                           point_policy='follow_mouse',
                           callback=CustomJS(code=js, args={'line_source': line_source}))
 
-    surveyprogress = get_surveyprogress(exposures, tiles, line_source, hover_follow, width=width, height=height, min_border_left=min_border_left, min_border_right=min_border_right)
-    tileprogress = get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=width, height=height, min_border_left=min_border_left, min_border_right=min_border_right)
+    progress = dict()
+    for program in ['DARK', 'GRAY', 'BRIGHT']:
+        progress[program] = get_progress(exposures, tiles, program)
+
+    surveyprogress = get_surveyprogress_plot(progress, line_source, hover_follow, width=width, height=height, min_border_left=min_border_left, min_border_right=min_border_right)
+    tileprogress = get_tileprogress_plot(progress, tiles, line_source, hover_follow, width=width, height=height, min_border_left=min_border_left, min_border_right=min_border_right)
     return gridplot([surveyprogress, tileprogress], ncols=2, plot_width=width, plot_height=height, toolbar_location='right')
 
 def get_hist(exposures, attribute, color, width=250, height=250, min_border_left=50, min_border_right=50):
