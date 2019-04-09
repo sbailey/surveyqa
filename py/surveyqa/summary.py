@@ -18,9 +18,7 @@ from astropy.time import Time, TimezoneInfo
 from astropy.table import Table, join
 from datetime import datetime, tzinfo
 import astropy.units as u
-
 from collections import Counter, OrderedDict
-
 
 
 def nights_first_observed(exposures, tiles):
@@ -60,21 +58,43 @@ def get_skyplot(exposures, tiles, width=500, height=250, min_border_left=50, min
     Returns bokeh Figure object
     '''
     observed = np.in1d(tiles['TILEID'], exposures['TILEID'])
-    nights, nights_int = nights_first_observed(exposures, tiles)
+
+    tiles_unique, indx = np.unique(exposures['TILEID'], return_index=True)
+    nights = exposures['MJD'][indx]
+    nights = nights[1:len(nights)]
+    nights_int = np.array(nights.astype(int))
+
+    exposures_id = exposures['EXPID'][indx]
+    exposures_id = exposures_id[1:len(exposures_id)]
+    exposures_id = np.array(exposures_id.astype(int))
 
     source = ColumnDataSource(data=dict(
-    RA = tiles['RA'],
-    DEC = tiles['DEC']))
+        RA = tiles['RA'],
+        DEC = tiles['DEC'],
+        TILEID = tiles['TILEID'],
+        MJD = ["NA" for _ in np.ones(len(tiles['TILEID']))],
+        EXPID = ["NA" for _ in np.ones(len(tiles['TILEID']))]
+    ))
 
     source_obs = ColumnDataSource(data=dict(
         RA_obs = tiles['RA'][observed],
         DEC_obs = tiles['DEC'][observed],
-        MJD = nights_int
+        TILEID = tiles['TILEID'][observed],
+        MJD = nights_int,
+        EXPID = exposures_id
     ))
+
+    hover = HoverTool(
+            tooltips=[
+                ("TILEID", "@TILEID"),
+                ("1ST EXPID", "@EXPID"),
+                ("1ST EXP MJD", "@MJD")
+            ]
+        )
 
     color_mapper = LinearColorMapper(palette="Viridis256", low=nights_int.min(), high=nights_int.max())
 
-    ##making figure
+    #making figure
     fig = bk.figure(width=width, height=height, min_border_left=min_border_left, min_border_right=min_border_right)
 
     #unobserved tiles
@@ -89,11 +109,13 @@ def get_skyplot(exposures, tiles, width=500, height=250, min_border_left=50, min
     fig.yaxis.axis_label = 'Declination [degrees]'
     fig.title.text = 'Observed Tiles, Nightly Progress'
 
+    fig.add_tools(hover)
+
     return fig
 
 def get_median(attribute, exposures):
     '''Get the median value for a given attribute for all nights for all exposures taken each night.
-    Input: 
+    Input:
         attributes: one of the labels in the exposure column, string
         exposures: table with the exposures data
     Output:
@@ -105,7 +127,7 @@ def get_median(attribute, exposures):
         exp_night = exposures[exposures['NIGHT'] == n]
         attrib = exp_night[attribute]
         medians.append(np.median(attrib))
-    
+
     return np.array(medians)
 
 def get_summarytable(exposures):
@@ -222,7 +244,10 @@ def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, h
     tne.sort('MJD')
 
     def bgd(string):
-        tne_d = tne[tne["PROGRAM"] == string]
+        w = tne["PROGRAM"] == string
+        if not any(w):
+            return ([], [])
+        tne_d = tne[w]
         x_d = np.array(tne_d['MJD'])
         y_d1 = np.array(tne_d['EXPOSEFAC'])
         s = 0
@@ -322,13 +347,18 @@ def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=25
     tzone = TimezoneInfo(utc_offset = -7*u.hour)
 
     def bgd(string):
-        tne_d = exposures_nocalib[exposures_nocalib["PROGRAM"] == string]
+        w = exposures_nocalib["PROGRAM"] == string
+        if not any(w):
+            return ([], [])
+        tne_d = exposures_nocalib[w]
         x_d = np.array(tne_d['MJD'])
         s = 0
         y_d = np.array([])
         for i in x_d:
             s += 1
             y_d = np.append(y_d, s)
+        if x_d == []:
+            return ([], [])
         t1 = Time(x_d, format='mjd', scale='utc')
         t = t1.to_datetime(timezone=tzone)
         return (t, y_d)
@@ -483,20 +513,20 @@ def get_hist(exposures, attribute, color, width=250, height=250, min_border_left
     hist, edges = np.histogram(exposures_nocalib[attribute], density=True, bins=50)
 
     fig_0 = bk.figure(plot_width=width, plot_height=height,
-                    x_axis_label = attribute.title(), 
+                    x_axis_label = attribute.title(),
                     min_border_left=min_border_left, min_border_right=min_border_right,
                     title = 'title')
-                    
+
     fig_0.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5)
     fig_0.toolbar_location = None
     fig_0.title.text_color = '#ffffff'
-    
+
     if attribute == 'TRANSP':
         fig_0.xaxis.axis_label = 'Transparency'
-        
+
     if attribute == 'HOURANGLE':
         fig_0.xaxis.axis_label = 'Hour Angle'
-        
+
     return fig_0
 
 def get_exposuresPerTile_hist(exposures, color, width=250, height=250, min_border_left=50, min_border_right=50):
@@ -563,7 +593,10 @@ def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, m
             program: String of the desired program name
             color: Color of histogram
         '''
-        a = exposures_nocalib[exposures_nocalib["PROGRAM"] == program]
+        w = exposures_nocalib["PROGRAM"] == program
+        if not any(w):
+            return
+        a = exposures_nocalib[w]
         hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
         fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
 
@@ -575,7 +608,7 @@ def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, m
     fig.toolbar_location = None
     fig.yaxis[0].formatter = NumeralTickFormatter(format="0.000")
     fig.yaxis.major_label_orientation = np.pi/4
-    
+
     return fig
 
 def get_moonplot(exposures, width=250, height=250, min_border_left=50, min_border_right=50):
@@ -610,7 +643,6 @@ def get_moonplot(exposures, width=250, height=250, min_border_left=50, min_borde
     p.title.text = 'Moon Fraction vs Moon Altitude, colored with MOONSEP'
 
     p.circle("MOONFRAC", "MOONALT", color=transform('MOONSEP', color_mapper), alpha=0.5, source=source)
-    p.toolbar_location = None
     return p
 
 def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min_border_right=50):
@@ -650,10 +682,13 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
             color: Color of histogram
         '''
         a = exposures_nocalib.group_by("TILEID").groups.aggregate(sum_or_first)
-        a = a[a["PROGRAM"] == program]
+        w = a["PROGRAM"] == program
+        if not any(w):
+            return
+        a = a[w]
         hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
         fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
-        
+
 
     total_exptime_dgb("DARK", "red")
     total_exptime_dgb("GRAY", "blue")
@@ -662,7 +697,7 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
     fig.legend.click_policy="hide"
     fig.yaxis[0].formatter = NumeralTickFormatter(format="0.000")
     fig.yaxis.major_label_orientation = np.pi/4
-    
+
     return fig
 
 def makeplots(exposures, tiles, outdir):
@@ -768,7 +803,7 @@ def makeplots(exposures, tiles, outdir):
                     <div>{{ transp_hist_script }} {{ transp_hist_div }}</div>
                     <div>{{ exposePerTile_hist_script }} {{ exposePerTile_hist_div }}</div>
                     <div>{{ brightness_script }} {{ brightness_div }}</div>
-                    <div>{{ hourangle_script }} {{ hourangle_div }}</div> 
+                    <div>{{ hourangle_script }} {{ hourangle_div }}</div>
                     <div>{{ moonplot_script }} {{ moonplot_div }}</div>
                     <div>{{ exptime_script }} {{ exptime_div }}</div>
                     <div>{{ expTimePerTile_script}} {{ expTimePerTile_div }}</div>
@@ -791,7 +826,7 @@ def makeplots(exposures, tiles, outdir):
     """
 
     min_border = 30
-    
+
     skyplot = get_skyplot(exposures, tiles, 500, 300, min_border_left=min_border, min_border_right=min_border)
     skyplot_script, skyplot_div = components(skyplot)
 
