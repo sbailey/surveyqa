@@ -57,42 +57,57 @@ def get_skyplot(exposures, tiles, width=500, height=250, min_border_left=50, min
 
     Returns bokeh Figure object
     '''
-    observed = np.in1d(tiles['TILEID'], exposures['TILEID'])
+    keep = exposures['PROGRAM'] != 'CALIB'
+    exposures_nocalib = exposures[keep]
+    tiles_sorted = Table(np.sort(tiles, order='TILEID'))
+    observed_tiles = np.in1d(tiles_sorted['TILEID'], exposures_nocalib['TILEID'])
+    observed_exposures = np.in1d(exposures_nocalib['TILEID'], tiles_sorted['TILEID'])
+    tiles_shared = tiles_sorted[observed_tiles]
+    exposures_shared = exposures_nocalib[observed_exposures]
 
-    tiles_unique, indx = np.unique(exposures['TILEID'], return_index=True)
-    nights = exposures['MJD'][indx]
-    nights = nights[1:len(nights)]
-    nights_int = np.array(nights.astype(int))
+    tiles_unique, indx = np.unique(exposures_shared['TILEID'], return_index=True)
+    nights = exposures_shared['NIGHT'][indx]
+    nights_int = np.array(nights).astype(int)
 
-    exposures_id = exposures['EXPID'][indx]
-    exposures_id = exposures_id[1:len(exposures_id)]
-    exposures_id = np.array(exposures_id.astype(int))
+    mjd = exposures_shared['MJD'][indx]
+    mjd_int = np.array(mjd).astype(int)
+
+    expid = exposures_shared['EXPID'][indx]
+    expid_int = np.array(expid).astype(int)
 
     source = ColumnDataSource(data=dict(
-        RA = tiles['RA'],
-        DEC = tiles['DEC'],
-        TILEID = tiles['TILEID'],
+        RA = tiles_sorted['RA'],
+        DEC = tiles_sorted['DEC'],
+        TILEID = tiles_sorted['TILEID'],
+        PROGRAM = tiles_sorted['PROGRAM'].astype(str),
+        PASS = tiles_sorted['PASS'].astype(int),
+        NIGHT = ["NA" for _ in np.ones(len(tiles['TILEID']))],
         MJD = ["NA" for _ in np.ones(len(tiles['TILEID']))],
         EXPID = ["NA" for _ in np.ones(len(tiles['TILEID']))]
     ))
 
     source_obs = ColumnDataSource(data=dict(
-        RA_obs = tiles['RA'][observed],
-        DEC_obs = tiles['DEC'][observed],
-        TILEID = tiles['TILEID'][observed],
-        MJD = nights_int,
-        EXPID = exposures_id
+        RA_obs = tiles_shared['RA'],
+        DEC_obs = tiles_shared['DEC'],
+        TILEID = tiles_shared['TILEID'],
+        PROGRAM = tiles_shared['PROGRAM'].astype(str),
+        PASS = tiles_shared['PASS'].astype(int),
+        NIGHT = nights_int,
+        MJD = mjd_int,
+        EXPID = expid_int
     ))
 
     hover = HoverTool(
-            tooltips=[
-                ("TILEID", "@TILEID"),
-                ("1ST EXPID", "@EXPID"),
-                ("1ST EXP MJD", "@MJD")
-            ]
+            tooltips="""
+                <font face="Arial" size="0">
+                <font color="blue"> TILEID: </font> @TILEID <br>
+                <font color="blue"> 1ST NIGHT/EXPID: </font> @NIGHT / @EXPID <br>
+                <font color="blue"> PROGRAM/PASS: </font> @PROGRAM / @PASS
+                </font>
+            """
         )
 
-    color_mapper = LinearColorMapper(palette="Viridis256", low=nights_int.min(), high=nights_int.max())
+    color_mapper = LinearColorMapper(palette="Viridis256", low=mjd_int.min(), high=mjd_int.max())
 
     #making figure
     fig = bk.figure(width=width, height=height, min_border_left=min_border_left, min_border_right=min_border_right)
