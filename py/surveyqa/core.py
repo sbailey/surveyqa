@@ -8,7 +8,7 @@ import numpy as np
 import surveyqa.summary
 import surveyqa.nightly
 
-def makeplots(exposures, tiles, outdir, show_summary = True, nights = None):
+def makeplots(exposures, tiles, outdir, show_summary = 2, nights = None):
     '''
     Generates summary plots for the DESI survey QA
 
@@ -16,8 +16,12 @@ def makeplots(exposures, tiles, outdir, show_summary = True, nights = None):
         exposures: Table of exposures with columns ...
         tiles: Table of tile locations with columns ...
         outdir: directory to write the files
+        show_summary:
+            if =0: does not make a summary page
+            if =1: make summary page on subset provided (if no subset provided, make summary page on all nights)
+            if =2: make summary page on all nights
+            else: causes an error
         nights: list of nights (as integers or strings)
-        show_summary: if True, create summary and nightly plots; else, just create nightly plots
 
     Writes outdir/summary.html and outdir/night-*.html
     '''
@@ -35,16 +39,21 @@ def makeplots(exposures, tiles, outdir, show_summary = True, nights = None):
 
     exposures["HOURANGLE"] = [change_range(i) for i in exposures["HOURANGLE"]]
 
+    exposures_sub = exposures
     if nights is not None:
         nights = [str(i) for i in nights]
-        exposures = exposures[[x in nights for x in exposures['NIGHT']]]
+        exposures_sub = exposures[[x in nights for x in exposures['NIGHT']]]
 
     exptiles = np.unique(exposures['TILEID'])
     print('Generating QA for {} exposures on {} tiles'.format(
         len(exposures), len(exptiles)))
 
-    if show_summary:
+    if show_summary==1:
+        surveyqa.summary.makeplots(exposures_sub, tiles, outdir)
+    elif show_summary==2:
         surveyqa.summary.makeplots(exposures, tiles, outdir)
+    elif show_summary:
+        raise Exception('show_summary should be 0, 1, or 2. The value of show_summary was: {}'.format(show_summary))
 
-    for night in sorted(set(exposures['NIGHT'])):
-        surveyqa.nightly.makeplots(night, exposures, tiles, outdir)
+    for night in sorted(set(exposures_sub['NIGHT'])):
+        surveyqa.nightly.makeplots(night, exposures_sub, tiles, outdir)
