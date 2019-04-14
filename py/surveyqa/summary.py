@@ -18,10 +18,12 @@ from astropy.time import Time, TimezoneInfo
 from astropy.table import Table, join
 from datetime import datetime, tzinfo
 import astropy.units as u
-
 from collections import Counter, OrderedDict
 
-
+#- Avoid warnings from date & coord calculations in the future
+import warnings
+warnings.filterwarnings('ignore', 'ERFA function.*dubious year.*')
+warnings.filterwarnings('ignore', 'Tried to get polar motions for times after IERS data is valid.*')
 
 def nights_first_observed(exposures, tiles):
     '''
@@ -59,22 +61,59 @@ def get_skyplot(exposures, tiles, width=500, height=250, min_border_left=50, min
 
     Returns bokeh Figure object
     '''
-    observed = np.in1d(tiles['TILEID'], exposures['TILEID'])
-    nights, nights_int = nights_first_observed(exposures, tiles)
+    keep = exposures['PROGRAM'] != 'CALIB'
+    exposures_nocalib = exposures[keep]
+    tiles_sorted = Table(np.sort(tiles, order='TILEID'))
+    observed_tiles = np.in1d(tiles_sorted['TILEID'], exposures_nocalib['TILEID'])
+    observed_exposures = np.in1d(exposures_nocalib['TILEID'], tiles_sorted['TILEID'])
+    tiles_shared = tiles_sorted[observed_tiles]
+    exposures_shared = exposures_nocalib[observed_exposures]
+
+    tiles_unique, indx = np.unique(exposures_shared['TILEID'], return_index=True)
+    nights = exposures_shared['NIGHT'][indx]
+    nights_int = np.array(nights).astype(int)
+
+    mjd = exposures_shared['MJD'][indx]
+    mjd_int = np.array(mjd).astype(int)
+
+    expid = exposures_shared['EXPID'][indx]
+    expid_int = np.array(expid).astype(int)
 
     source = ColumnDataSource(data=dict(
-    RA = tiles['RA'],
-    DEC = tiles['DEC']))
-
-    source_obs = ColumnDataSource(data=dict(
-        RA_obs = tiles['RA'][observed],
-        DEC_obs = tiles['DEC'][observed],
-        MJD = nights_int
+        RA = tiles_sorted['RA'],
+        DEC = tiles_sorted['DEC'],
+        TILEID = tiles_sorted['TILEID'],
+        PROGRAM = tiles_sorted['PROGRAM'].astype(str),
+        PASS = tiles_sorted['PASS'].astype(int),
+        NIGHT = ["NA" for _ in np.ones(len(tiles['TILEID']))],
+        MJD = ["NA" for _ in np.ones(len(tiles['TILEID']))],
+        EXPID = ["NA" for _ in np.ones(len(tiles['TILEID']))]
     ))
 
-    color_mapper = LinearColorMapper(palette="Viridis256", low=nights_int.min(), high=nights_int.max())
+    source_obs = ColumnDataSource(data=dict(
+        RA_obs = tiles_shared['RA'],
+        DEC_obs = tiles_shared['DEC'],
+        TILEID = tiles_shared['TILEID'],
+        PROGRAM = tiles_shared['PROGRAM'].astype(str),
+        PASS = tiles_shared['PASS'].astype(int),
+        NIGHT = nights_int,
+        MJD = mjd_int,
+        EXPID = expid_int
+    ))
 
-    ##making figure
+    hover = HoverTool(
+            tooltips="""
+                <font face="Arial" size="0">
+                <font color="blue"> TILEID: </font> @TILEID <br>
+                <font color="blue"> PROGRAM/PASS: </font> @PROGRAM / @PASS <br>
+                <font color="blue"> 1ST NIGHT/EXPID: </font> @NIGHT / @EXPID
+                </font>
+            """
+        )
+
+    color_mapper = LinearColorMapper(palette="Viridis256", low=mjd_int.min(), high=mjd_int.max())
+
+    #making figure
     fig = bk.figure(width=width, height=height, min_border_left=min_border_left, min_border_right=min_border_right)
 
     #unobserved tiles
@@ -88,6 +127,8 @@ def get_skyplot(exposures, tiles, width=500, height=250, min_border_left=50, min
     fig.xaxis.axis_label = 'RA [degrees]'
     fig.yaxis.axis_label = 'Declination [degrees]'
     fig.title.text = 'Observed Tiles, Nightly Progress'
+
+    fig.add_tools(hover)
 
     return fig
 
@@ -104,7 +145,7 @@ def get_median(attribute, exposures):
     for n in list(OrderedDict(Counter(night)).keys()):
         exp_night = exposures[exposures['NIGHT'] == n]
         attrib = exp_night[attribute]
-        medians.append(np.median(attrib))
+        medians.append(np.ma.median(attrib))  #- use masked median
 
     return np.array(medians)
 
@@ -335,6 +376,8 @@ def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=25
         for i in x_d:
             s += 1
             y_d = np.append(y_d, s)
+        if x_d == []:
+            return ([], [])
         t1 = Time(x_d, format='mjd', scale='utc')
         t = t1.to_datetime(timezone=tzone)
         return (t, y_d)
@@ -569,7 +612,10 @@ def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, m
             program: String of the desired program name
             color: Color of histogram
         '''
-        a = exposures_nocalib[exposures_nocalib["PROGRAM"] == program]
+        w = exposures_nocalib["PROGRAM"] == program
+        if not any(w):
+            return
+        a = exposures_nocalib[w]
         hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
         fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
 
@@ -616,7 +662,6 @@ def get_moonplot(exposures, width=250, height=250, min_border_left=50, min_borde
     p.title.text = 'Moon Fraction vs Moon Altitude, colored with MOONSEP'
 
     p.circle("MOONFRAC", "MOONALT", color=transform('MOONSEP', color_mapper), alpha=0.5, source=source)
-    p.toolbar_location = None
     return p
 
 def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min_border_right=50):
@@ -656,7 +701,10 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
             color: Color of histogram
         '''
         a = exposures_nocalib.group_by("TILEID").groups.aggregate(sum_or_first)
-        a = a[a["PROGRAM"] == program]
+        w = a["PROGRAM"] == program
+        if not any(w):
+            return
+        a = a[w]
         hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
         fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
 
