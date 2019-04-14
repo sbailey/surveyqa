@@ -27,6 +27,7 @@ from bokeh.palettes import viridis
 from bokeh.transform import factor_cmap
 from bokeh.models.widgets.tables import DataTable, TableColumn
 from astropy import coordinates
+from bokeh.models.widgets import NumberFormatter
 
 #- Avoid warnings from date & coord calculations in the future
 import warnings
@@ -107,37 +108,22 @@ def plot_timeseries(source, name, color, tools=None, x_range=None, title=None, t
                    size=6, line_width=2, hover_color='firebrick', source=source)
 
     #- Formatting
-    fig.ygrid.grid_line_color = None
     fig.xgrid.grid_line_color = None
     fig.outline_line_color = None
     fig.yaxis.axis_label = name.title()
+    
+    if name == 'TRANSP':
+        fig.yaxis.axis_label = 'Transparency'
+    if name == 'HOURANGLE':
+        fig.yaxis.axis_label = 'Hour Angle'
+    if name == 'EXPTIME':
+        fig.yaxis.axis_label = 'Exposure Time'
 
     #- Add hover tool
     hover = HoverTool(renderers = [r], tooltips=tooltips)
     fig.add_tools(hover)
 
     return fig
-
-def hourangle_timeseries(width=600, height=200, min_border_left=50, min_border_right=50):
-    '''Placeholder for a hour angle vs. time plot'''
-    p = bk.figure(plot_width=width, plot_height=height,
-                  x_axis_label='Time',
-                  y_axis_label='Hour Angle', min_border_left=min_border_left, 
-                  min_border_right=min_border_right)
-    p.xaxis.axis_label_text_color='#ffffff'
-    p.toolbar_location = None
-    return p
-
-def brightness_timeseries(width=600, height=200, min_border_left=50, min_border_right=50):
-    '''Placeholder for a sky brightness timeseries plot'''
-    p = bk.figure(plot_width=width, plot_height=height, 
-                  x_axis_label='Time',
-                  y_axis_label='Sky Brightness', 
-                  min_border_left=min_border_left,
-                  min_border_right=min_border_right)
-    p.xaxis.axis_label_text_color='#ffffff'
-    p.toolbar_location = None
-    return p
 
 def get_nightlytable(exposures):
     '''
@@ -155,17 +141,28 @@ def get_nightlytable(exposures):
         program = np.array(exposures['PROGRAM'], dtype='str'),
         exptime = np.array(exposures['EXPTIME']),
         tileid = np.array(exposures['TILEID']),
+        airmass = np.array(exposures['AIRMASS']),
+        seeing = np.array(exposures['SEEING']),
+        transp = np.array(exposures['TRANSP']),
+        sky = np.array(exposures['SKY']),
+        hourangle = np.array(exposures['HOURANGLE']),  
     ))
 
+    formatter = NumberFormatter(format='0,0.00')
     columns = [
         TableColumn(field='expid', title='Exposure ID'),
         TableColumn(field='flavor', title='Flavor'),
         TableColumn(field='program', title='Program'),
         TableColumn(field='exptime', title='Exposure Time'),
         TableColumn(field='tileid', title='Tile ID'),
+        TableColumn(field='airmass', title='Airmass', formatter=formatter),
+        TableColumn(field='seeing', title='Seeing', formatter=formatter),
+        TableColumn(field='transp', title='Transparency', formatter=formatter),
+        TableColumn(field='sky', title='Sky', formatter=formatter),
+        TableColumn(field='hourangle', title='Hour Angle', formatter=formatter),
     ]
 
-    nightly_table = DataTable(source=source, columns=columns, sortable=True)
+    nightly_table = DataTable(source=source, columns=columns, width=1000, sortable=True)
 
     return nightly_table
 
@@ -281,11 +278,25 @@ def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, h
     hist_all, edges_all = np.histogram(np.array(all_exposures[attribute]), density=True, bins=50)
     hist_night, edges_night = np.histogram(np.array(night_exposures[attribute]), density=True, bins=50)
 
-    fig = bk.figure(plot_width=width, plot_height=height, # title = attribute + " Histogram",
-                    x_axis_label = attribute.title(), min_border_left=min_border_left, min_border_right=min_border_right)
+    fig = bk.figure(plot_width=width, plot_height=height,
+                    x_axis_label = attribute.title(), y_axis_label = 'title',
+                    min_border_left=min_border_left, min_border_right=min_border_right)
     fig.quad(top=hist_all, bottom=0, left=edges_all[:-1], right=edges_all[1:], fill_color=color, alpha=0.2)
     fig.quad(top=hist_night, bottom=0, left=edges_night[:-1], right=edges_night[1:], fill_color=color, alpha=0.6)
-
+    
+    if attribute == 'TRANSP':
+        fig.xaxis.axis_label = 'Transparency'
+    if attribute == 'HOURANGLE':
+        fig.xaxis.axis_label = 'Hour Angle'
+    if attribute == 'EXPTIME':
+        fig.xaxis.axis_label = 'Exposure Time'
+    
+    fig.yaxis.major_label_text_font_size = '0pt'
+    fig.yaxis.major_tick_line_color = None  
+    fig.yaxis.minor_tick_line_color = None
+    fig.yaxis.axis_label_text_color = '#ffffff'
+    fig.ygrid.grid_line_color = None
+    fig.xgrid.grid_line_color = None
     fig.toolbar_location = None
 
     return fig
@@ -328,13 +339,23 @@ def makeplots(night, exposures, tiles, outdir):
     src = ColumnDataSource(data={c:np.array(exposures[c]) for c in COLS})
 
     #- Get timeseries plots for several variables
-    min_border = 50
-    airmass = plot_timeseries(src, 'AIRMASS', 'green', tools=TOOLS, x_range=None, title=None, tooltips=TOOLTIPS, width=600, height=250, min_border_left=min_border, min_border_right=min_border)
-    seeing = plot_timeseries(src, 'SEEING', 'navy', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=250, min_border_left=min_border, min_border_right=min_border)
-    exptime = plot_timeseries(src, 'EXPTIME', 'darkorange', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=250, min_border_left=min_border, min_border_right=min_border)
-    transp = plot_timeseries(src, 'TRANSP', 'purple', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=250, min_border_left=min_border, min_border_right=min_border)
-    hourangle = plot_timeseries(src, 'HOURANGLE', 'maroon', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=250, min_border_left=min_border, min_border_right=min_border)
-    brightness = plot_timeseries(src, 'SKY', 'pink', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=250, min_border_left=min_border, min_border_right=min_border)
+    min_border_right_time = 0
+    min_border_left_time = 60
+    min_border_right_hist = 0
+    min_border_left_hist = 70
+    min_border_right_count = 0
+    min_border_left_count = 70
+    min_border_right_sky = 0
+    min_border_left_sky = 60
+    
+    time_hist_plot_height = 160
+    
+    airmass = plot_timeseries(src, 'AIRMASS', 'green', tools=TOOLS, x_range=None, title=None, tooltips=TOOLTIPS, width=600, height=time_hist_plot_height, min_border_left=min_border_left_time, min_border_right=min_border_right_time)
+    seeing = plot_timeseries(src, 'SEEING', 'navy', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=time_hist_plot_height, min_border_left=min_border_left_time, min_border_right=min_border_right_time)
+    exptime = plot_timeseries(src, 'EXPTIME', 'darkorange', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=time_hist_plot_height, min_border_left=min_border_left_time, min_border_right=min_border_right_time)
+    transp = plot_timeseries(src, 'TRANSP', 'purple', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=time_hist_plot_height, min_border_left=min_border_left_time, min_border_right=min_border_right_time)
+    hourangle = plot_timeseries(src, 'HOURANGLE', 'maroon', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=time_hist_plot_height, min_border_left=min_border_left_time, min_border_right=min_border_right_time)
+    brightness = plot_timeseries(src, 'SKY', 'pink', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=time_hist_plot_height, min_border_left=min_border_left_time, min_border_right=min_border_right_time)
 
     #- Convert these to the components to include in the HTML
     timeseries_script, timeseries_div = components(bk.Column(airmass, seeing, exptime, transp, hourangle, brightness))
@@ -344,20 +365,20 @@ def makeplots(night, exposures, tiles, outdir):
     table_script, table_div = components(nightlytable)
 
     #adding in the skyplot components
-    skypathplot = get_skypathplot(exposures, tiles, width=600, height=300, min_border_left=min_border, min_border_right=min_border)
+    skypathplot = get_skypathplot(exposures, tiles, width=600, height=250, min_border_left=min_border_left_sky, min_border_right=min_border_right_sky)
     skypathplot_script, skypathplot_div = components(skypathplot)
 
     #adding in the components of the exposure types bar plot
-    exptypecounts = get_exptype_counts(exposures, calibs, width=400, height=300, min_border_left=min_border, min_border_right=min_border)
+    exptypecounts = get_exptype_counts(exposures, calibs, width=250, height=250, min_border_left=min_border_left_count, min_border_right=min_border_right_count)
     exptypecounts_script, exptypecounts_div = components(exptypecounts)
 
     #- Get overlaid histograms for several variables
-    airmasshist = overlaid_hist(all_exposures, exposures, 'AIRMASS', 'green', 400, 250, min_border_left=min_border, min_border_right=min_border)
-    seeinghist = overlaid_hist(all_exposures, exposures, 'SEEING', 'navy', 400, 250, min_border_left=min_border, min_border_right=min_border)
-    exptimehist = overlaid_hist(all_exposures, exposures, 'EXPTIME', 'darkorange', 400, 250, min_border_left=min_border, min_border_right=min_border)
-    transphist = overlaid_hist(all_exposures, exposures, 'TRANSP', 'purple', 400, 250, min_border_left=min_border, min_border_right=min_border)
-    houranglehist = overlaid_hist(all_exposures, exposures, 'HOURANGLE', 'maroon', 400, 250, min_border_left=min_border, min_border_right=min_border)
-    brightnesshist = overlaid_hist(all_exposures, exposures, 'SKY', 'pink', 400, 250, min_border_left=min_border, min_border_right=min_border)
+    airmasshist = overlaid_hist(all_exposures, exposures, 'AIRMASS', 'green', 250, time_hist_plot_height, min_border_left=min_border_left_hist, min_border_right=min_border_right_hist)
+    seeinghist = overlaid_hist(all_exposures, exposures, 'SEEING', 'navy', 250, time_hist_plot_height, min_border_left=min_border_left_hist, min_border_right=min_border_right_hist)
+    exptimehist = overlaid_hist(all_exposures, exposures, 'EXPTIME', 'darkorange', 250, time_hist_plot_height, min_border_left=min_border_left_hist, min_border_right=min_border_right_hist)
+    transphist = overlaid_hist(all_exposures, exposures, 'TRANSP', 'purple', 250, time_hist_plot_height, min_border_left=min_border_left_hist, min_border_right=min_border_right_hist)
+    houranglehist = overlaid_hist(all_exposures, exposures, 'HOURANGLE', 'maroon', 250, time_hist_plot_height, min_border_left=min_border_left_hist, min_border_right=min_border_right_hist)
+    brightnesshist = overlaid_hist(all_exposures, exposures, 'SKY', 'pink', 250, time_hist_plot_height, min_border_left=min_border_left_hist, min_border_right=min_border_right_hist)
 
     #adding in the components of the overlaid histograms
     overlaidhists_script, overlaidhists_div = components(bk.Column(airmasshist, seeinghist, exptimehist, transphist, houranglehist, brightnesshist))
@@ -421,7 +442,7 @@ def makeplots(night, exposures, tiles, outdir):
         display: flex;
         flex-direction: row;
         flex-flow: row wrap;
-        justify-content: space-around;
+        justify-content: center;
         padding: 10px;
     }
 
@@ -545,6 +566,8 @@ def get_exptype_counts(exposures, calibs, width=300, height=300, min_border_left
     p.add_layout(labels)
 
     p.ygrid.grid_line_color=None
+    p.xaxis.axis_label = 'label'
+    p.xaxis.axis_label_text_color = '#ffffff'
 
     return p
 

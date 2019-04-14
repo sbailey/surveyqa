@@ -337,6 +337,9 @@ def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, h
     fig1.legend.location = "top_left"
     fig1.legend.click_policy="hide"
     fig1.legend.spacing = 0
+    fig1.legend.label_text_font_size = '7pt'
+    fig1.legend.glyph_height = 10
+    fig1.legend.glyph_width = 10
 
     fig1.add_tools(hover)
     fig1.add_tools(hover_follow)
@@ -459,6 +462,9 @@ def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=25
     fig.legend.location = "top_left"
     fig.legend.click_policy="hide"
     fig.legend.spacing = 0
+    fig.legend.label_text_font_size = '7pt'
+    fig.legend.glyph_height = 10
+    fig.legend.glyph_width = 10
 
     fig.add_tools(hover)
     fig.add_tools(hover_follow)
@@ -539,7 +545,8 @@ def get_hist(exposures, attribute, color, width=250, height=250, min_border_left
     fig_0.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5)
     fig_0.toolbar_location = None
     fig_0.title.text_color = '#ffffff'
-
+    fig_0.yaxis.major_label_text_font_size = '0pt'
+    
     if attribute == 'TRANSP':
         fig_0.xaxis.axis_label = 'Transparency'
 
@@ -581,6 +588,8 @@ def get_exposuresPerTile_hist(exposures, color, width=250, height=250, min_borde
     fig_3.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color="orange", alpha=0.5)
     fig_3.toolbar_location = None
     fig_3.title.text_color = '#ffffff'
+    fig_3.yaxis.major_label_text_font_size = '0pt'
+    
     return fig_3
 
 def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, min_border_right=50):
@@ -600,8 +609,7 @@ def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, m
     keep = exposures['PROGRAM'] != 'CALIB'
     exposures_nocalib = exposures[keep]
 
-    fig = bk.figure(plot_width=width, plot_height=height, title = "Exposure Times",
-                    x_axis_label = "Exposure Time", min_border_left=min_border_left, min_border_right=min_border_right)
+    fig = bk.figure(plot_width=width, plot_height=height, title = 'title', x_axis_label = "Exposure Time", min_border_left=min_border_left, min_border_right=min_border_right)
 
     def exptime_dgb(program, color):
         '''
@@ -627,7 +635,12 @@ def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, m
     fig.toolbar_location = None
     fig.yaxis[0].formatter = NumeralTickFormatter(format="0.000")
     fig.yaxis.major_label_orientation = np.pi/4
-
+    fig.yaxis.major_label_text_font_size = '0pt'
+    fig.legend.label_text_font_size = '8.5pt'
+    fig.legend.glyph_height = 15
+    fig.legend.glyph_width = 15
+    fig.title.text_color = '#ffffff'
+    
     return fig
 
 def get_moonplot(exposures, width=250, height=250, min_border_left=50, min_border_right=50):
@@ -683,8 +696,10 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
     exposures_nocalib = exposures[keep]
     exposures_nocalib = exposures_nocalib["PROGRAM", "TILEID", "EXPTIME"]
 
-    fig = bk.figure(plot_width=width, plot_height=height, title = "Total Exposure Time Per Tile Histogram",
-                    x_axis_label = "Total Exposure Time", min_border_left=min_border_left, min_border_right=min_border_right)
+    fig = bk.figure(plot_width=width, plot_height=height, title = 'title', x_axis_label = "Total Exposure Time", min_border_left=min_border_left, min_border_right=min_border_right)
+    fig.yaxis.major_label_text_font_size = '0pt'
+    fig.xaxis.major_label_orientation = np.pi/4
+    fig.title.text_color = '#ffffff'
 
     def sum_or_first(i):
         if type(i[0]) is str:
@@ -716,6 +731,9 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
     fig.legend.click_policy="hide"
     fig.yaxis[0].formatter = NumeralTickFormatter(format="0.000")
     fig.yaxis.major_label_orientation = np.pi/4
+    fig.legend.label_text_font_size = '8.5pt'
+    fig.legend.glyph_height = 15
+    fig.legend.glyph_width = 15
 
     return fig
 
@@ -823,9 +841,9 @@ def makeplots(exposures, tiles, outdir):
                     <div>{{ exposePerTile_hist_script }} {{ exposePerTile_hist_div }}</div>
                     <div>{{ brightness_script }} {{ brightness_div }}</div>
                     <div>{{ hourangle_script }} {{ hourangle_div }}</div>
-                    <div>{{ moonplot_script }} {{ moonplot_div }}</div>
                     <div>{{ exptime_script }} {{ exptime_div }}</div>
-                    <div>{{ expTimePerTile_script}} {{ expTimePerTile_div }}</div>
+                    <div>{{ expTimePerTile_script }} {{ expTimePerTile_div }}</div>
+                    <div>{{ moonplot_script }} {{ moonplot_div }}</div>
                 </div>
 
                 <div class="header">
@@ -846,10 +864,10 @@ def makeplots(exposures, tiles, outdir):
 
     min_border = 30
 
-    skyplot = get_skyplot(exposures, tiles, 500, 300, min_border_left=min_border, min_border_right=min_border)
+    skyplot = get_skyplot(exposures, tiles, 500, 250, min_border_left=min_border, min_border_right=min_border)
     skyplot_script, skyplot_div = components(skyplot)
 
-    progressplot = get_linked_progress_plots(exposures, tiles, 375, 300, min_border_left=min_border, min_border_right=min_border)
+    progressplot = get_linked_progress_plots(exposures, tiles, 250, 250, min_border_left=min_border, min_border_right=min_border)
     progress_script, progress_div = components(progressplot)
 
     summarytable = get_summarytable(exposures)
@@ -867,7 +885,7 @@ def makeplots(exposures, tiles, outdir):
     exposePerTile_hist = get_exposuresPerTile_hist(exposures, "orange", 250, 250, min_border_left=min_border, min_border_right=min_border)
     exposePerTile_hist_script, exposePerTile_hist_div = components(exposePerTile_hist)
 
-    exptime_hist = get_exposeTimes_hist(exposures, 500, 250, min_border_left=min_border, min_border_right=min_border)
+    exptime_hist = get_exposeTimes_hist(exposures, 250, 250, min_border_left=min_border, min_border_right=min_border)
     exptime_script, exptime_div = components(exptime_hist)
 
     moonplot = get_moonplot(exposures, 500, 250, min_border_left=min_border, min_border_right=min_border)
@@ -879,7 +897,7 @@ def makeplots(exposures, tiles, outdir):
     hourangleplot = get_hist(exposures, "HOURANGLE", "magenta", 250, 250, min_border_left=min_border, min_border_right=min_border)
     hourangle_script, hourangle_div = components(hourangleplot)
 
-    expTimePerTile_plot = get_expTimePerTile(exposures, 500, 250, min_border_left=min_border, min_border_right=min_border)
+    expTimePerTile_plot = get_expTimePerTile(exposures, 250, 250, min_border_left=min_border, min_border_right=min_border)
     expTimePerTile_script, expTimePerTile_div = components(expTimePerTile_plot)
 
     #- Convert to a jinja2.Template object and render HTML
@@ -892,10 +910,10 @@ def makeplots(exposures, tiles, outdir):
         exptime_script=exptime_script, exptime_div=exptime_div,
         transp_hist_script=transp_hist_script, transp_hist_div=transp_hist_div,
         exposePerTile_hist_script=exposePerTile_hist_script, exposePerTile_hist_div=exposePerTile_hist_div,
-        moonplot_script=moonplot_script, moonplot_div=moonplot_div,
         brightness_script=brightness_script, brightness_div=brightness_div,
         hourangle_script=hourangle_script, hourangle_div=hourangle_div,
         expTimePerTile_script=expTimePerTile_script, expTimePerTile_div=expTimePerTile_div,
+        moonplot_script=moonplot_script, moonplot_div=moonplot_div,
         )
 
     outfile = os.path.join(outdir, 'summary.html')
