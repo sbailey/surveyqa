@@ -20,6 +20,10 @@ from datetime import datetime, tzinfo
 import astropy.units as u
 from collections import Counter, OrderedDict
 
+#- Avoid warnings from date & coord calculations in the future
+import warnings
+warnings.filterwarnings('ignore', 'ERFA function.*dubious year.*')
+warnings.filterwarnings('ignore', 'Tried to get polar motions for times after IERS data is valid.*')
 
 def nights_first_observed(exposures, tiles):
     '''
@@ -101,8 +105,8 @@ def get_skyplot(exposures, tiles, width=500, height=250, min_border_left=50, min
             tooltips="""
                 <font face="Arial" size="0">
                 <font color="blue"> TILEID: </font> @TILEID <br>
-                <font color="blue"> 1ST NIGHT/EXPID: </font> @NIGHT / @EXPID <br>
-                <font color="blue"> PROGRAM/PASS: </font> @PROGRAM / @PASS
+                <font color="blue"> PROGRAM/PASS: </font> @PROGRAM / @PASS <br>
+                <font color="blue"> 1ST NIGHT/EXPID: </font> @NIGHT / @EXPID
                 </font>
             """
         )
@@ -141,7 +145,7 @@ def get_median(attribute, exposures):
     for n in list(OrderedDict(Counter(night)).keys()):
         exp_night = exposures[exposures['NIGHT'] == n]
         attrib = exp_night[attribute]
-        medians.append(np.median(attrib))
+        medians.append(np.ma.median(attrib))  #- use masked median
 
     return np.array(medians)
 
