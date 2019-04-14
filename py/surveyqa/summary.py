@@ -841,10 +841,9 @@ def makeplots(exposures, tiles, outdir):
                     <div>{{ exposePerTile_hist_script }} {{ exposePerTile_hist_div }}</div>
                     <div>{{ brightness_script }} {{ brightness_div }}</div>
                     <div>{{ hourangle_script }} {{ hourangle_div }}</div>
-                    <div>{{ moonplot_script }} {{ moonplot_div }}</div>
                     <div>{{ exptime_script }} {{ exptime_div }}</div>
                     <div>{{ expTimePerTile_script }} {{ expTimePerTile_div }}</div>
-                     <div>{{ moonplot_script }} {{ moonplot_div }}</div>
+                    <div>{{ moonplot_script }} {{ moonplot_div }}</div>
                 </div>
 
                 <div class="header">
