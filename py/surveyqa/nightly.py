@@ -29,6 +29,11 @@ from bokeh.models.widgets.tables import DataTable, TableColumn
 from astropy import coordinates
 from bokeh.models.widgets import NumberFormatter
 
+#- Avoid warnings from date & coord calculations in the future
+import warnings
+warnings.filterwarnings('ignore', 'ERFA function.*dubious year.*')
+warnings.filterwarnings('ignore', 'Tried to get polar motions for times after IERS data is valid.*')
+
 def find_night(exposures, night):
     """
     Generates a subtable of exposures corresponding to data from a single night N and adds column TIME
