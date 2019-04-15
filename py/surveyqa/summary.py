@@ -142,8 +142,6 @@ def get_median(attribute, exposures):
     '''
     medians = []
     for n in np.unique(exposures['NIGHT']):
-        # exp_night = exposures[exposures['NIGHT'] == n]
-        # attrib = exp_night[attribute]
         ii = (exposures['NIGHT'] == n)
         attrib = np.asarray(exposures[attribute])[ii]
         medians.append(np.ma.median(attrib))  #- use masked median
@@ -286,8 +284,8 @@ def get_surveyprogress_plot(progress, line_source, hover_follow, width=250, heig
     TODO: update docs for what "progress" is
 
     Args:
-        progress: dict keyed by DARK, GRAY, BRIGHT, with values 
-            (time, survey_progress, tile_progress) from get_progress    
+        progress: dict keyed by DARK, GRAY, BRIGHT, with values
+            (time, survey_progress, tile_progress) from get_progress
         line_source: line_source for the horizontal gray cursor-tracking line
         hover_follow: HoverTool object for the horizontal gray cursor-tracking line
 
@@ -368,8 +366,8 @@ def get_tileprogress_plot(progress, tiles, line_source, hover_follow, width=250,
     Generates a plot of survey progress (total tiles) vs. time
 
     Args:
-        progress: dict keyed by DARK, GRAY, BRIGHT, with values 
-            (time, survey_progress, tile_progress) from get_progress    
+        progress: dict keyed by DARK, GRAY, BRIGHT, with values
+            (time, survey_progress, tile_progress) from get_progress
         tiles: Table of tile locations with columns "TILEID", "PROGRAM"
         line_source: line_source for the horizontal gray cursor-tracking line
         hover_follow: HoverTool object for the horizontal gray cursor-tracking line
@@ -715,8 +713,6 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
             program: String of the desired program name
             color: Color of histogram
         '''
-        # a = exposures_nocalib.group_by("TILEID").groups.aggregate(sum_or_first)
-        # a = a[a["PROGRAM"] == program]
         thisprogram = (exposures_nocalib["PROGRAM"] == program)
         a = exposures_nocalib["TILEID", "EXPTIME"][thisprogram].group_by("TILEID").groups.aggregate(np.sum)
 
