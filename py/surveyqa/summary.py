@@ -699,11 +699,6 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
     fig.xaxis.major_label_orientation = np.pi/4
     fig.title.text_color = '#ffffff'
 
-    def sum_or_first(i):
-        if type(i[0]) is str:
-            return i[0]
-        return np.sum(i)
-
     def total_exptime_dgb(program, color):
         '''
         Adds a histogram to fig that correspond to the program of the argument with the color provided.
