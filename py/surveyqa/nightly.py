@@ -167,6 +167,82 @@ def get_nightlytable(exposures):
     return nightly_table
 
 
+def getPhase(night):
+    '''
+    Returns the phase of the moon as a decimal given the number of nights since full_zero
+    
+    Args:
+        night : number of nights since full_zero, an inital night of full moon
+    '''
+    phase = -0.5 * np.sin(np.pi/15 * (night)) + 0.5
+    return phase
+
+
+def phaseSign(night):
+    dt = -1 * np.cos(np.pi/15*night)
+    return dt
+
+
+def toDatetime(night):
+    '''
+    Returns the night parsed into a datetime object
+    
+    Args:
+        night: a single night given as YYYYMMDD in string representation
+    '''
+    n = datetime(int(night[:4]), int(night[4:6]), int(night[6:]))
+    return n
+
+
+def numNightsFullZero(date):
+    '''
+    Returns the number of nights since a specified night of the full moon,
+    full_zero (11/12/2019 6:34)
+    
+    Args:
+        night: a single night given as a datetime object
+    '''
+    full_zero = datetime(2019, 11, 12, 6, 34)
+    diff = date - full_zero
+    return diff.days
+
+
+def getWedge(phase, der, fig, ra, dec):
+    '''
+    Given a phase of the moon, returns the bokeh rendered point to represent the phase on the skypath plot
+    
+    Args:
+        phase: a proportion representing the phase of the moon 
+            where 1 corresponds to full moon and 0 corresponds to no moon
+    '''
+    if (phase <= 0.25):
+        return fig.arc(ra, dec, start_angle=0, end_angle=2*np.pi, radius=4, color='gold')
+    elif (phase <= 0.75 and der > 0):
+        return fig.wedge(ra, dec, start_angle=-np.pi/2, end_angle=np.pi/2, radius=4, color='gold')
+    elif (phase <= 7.5 and der < 0):
+        return fig.wedge(ra, dec, start_angle=np.pi/2, end_angle=3*np.pi/2, radius=4, color='gold')
+    else:
+        return fig.wedge(ra, dec, start_angle=0, end_angle=2*np.pi, radius=4, color='gold')
+
+    
+def getMoonRend(night, fig, ra, dec):
+    '''
+    Configures settings for getWedge and returns a bokeh rendered point to represent the phase of the moon
+    on the skypath plot for a specific night
+    
+    Args:
+        night : a single string representation of a night = YEARMMDD
+        fig : a bokeh figure object from the skypath plot for the given NIGHT
+        ra :  the right ascension coordinate for the moon on the given NIGHT
+        dec: the declination coordinate for the moon on the given NIGHT
+    '''
+    n = numNightsFullZero(toDatetime(night))
+    phase = getPhase(n)
+    der = phaseSign(n)
+    moon = getWedge(phase, der, fig, ra, dec)
+    return moon
+
+
 def get_moonloc(night):
     """
     Returns the location of the moon on the given NIGHT
@@ -244,7 +320,8 @@ def get_skypathplot(exposures, tiles, width=600, height=300, min_border_left=50,
     night = exposures['NIGHT'][0]
     moon_loc = get_moonloc(night)
     ra, dec = float(moon_loc.ra.to_string(decimal=True)), float(moon_loc.dec.to_string(decimal=True))
-    fig.circle(ra, dec, size=10, color='gold')
+    moon = getMoonRend(night, fig, ra, dec)
+    #fig.circle(ra, dec, size=10, color='gold')    
     
 
     #- Circles the first point observed on NIGHT
