@@ -8,7 +8,7 @@ import numpy as np
 import surveyqa.summary
 import surveyqa.nightly
 
-def makeplots(exposures, tiles, outdir, show_summary = 2, nights = None):
+def makeplots(exposures, tiles, outdir, show_summary = "all", nights = None):
     '''
     Generates summary plots for the DESI survey QA
 
@@ -17,10 +17,10 @@ def makeplots(exposures, tiles, outdir, show_summary = 2, nights = None):
         tiles: Table of tile locations with columns ...
         outdir: directory to write the files
         show_summary:
-            if =0: does not make a summary page
-            if =1: make summary page on subset provided (if no subset provided, make summary page on all nights)
-            if =2: make summary page on all nights
-            else: causes an error
+            if = "no": does not make a summary page
+            if = "subset": make summary page on subset provided (if no subset provided, make summary page on all nights)
+            if = "all": make summary page on all nights
+            else: raises a ValueError
         nights: list of nights (as integers or strings)
 
     Writes outdir/summary.html and outdir/night-*.html
@@ -48,12 +48,12 @@ def makeplots(exposures, tiles, outdir, show_summary = 2, nights = None):
     print('Generating QA for {} exposures on {} tiles'.format(
         len(exposures), len(exptiles)))
 
-    if show_summary==1:
+    if show_summary=="subset":
         surveyqa.summary.makeplots(exposures_sub, tiles, outdir)
-    elif show_summary==2:
+    elif show_summary=="all":
         surveyqa.summary.makeplots(exposures, tiles, outdir)
-    elif show_summary:
-        raise Exception('show_summary should be 0, 1, or 2. The value of show_summary was: {}'.format(show_summary))
+    elif show_summary!="no":
+        raise ValueError('show_summary should be "all", "subset", or "no". The value of show_summary was: {}'.format(show_summary))
 
     for night in sorted(set(exposures_sub['NIGHT'])):
         surveyqa.nightly.makeplots(night, exposures_sub, tiles, outdir)
