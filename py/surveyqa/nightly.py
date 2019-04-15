@@ -172,23 +172,31 @@ def getPhase(night):
     Returns the phase of the moon as a decimal given the number of nights since full_zero
     
     Args:
-        night : number of nights since full_zero, an inital night of full moon
+        night : number of nights since full_zero, an initalized night of full moon
     '''
     phase = -0.5 * np.sin(np.pi/15 * (night)) + 0.5
     return phase
 
 
 def phaseSign(night):
+    '''
+    Returns the positive or negative sign of sine function used to calculate the moon phase
+    
+    Args:
+        night : the number of nights since full_zero, an initialized night of full moon
+    '''
     dt = -1 * np.cos(np.pi/15*night)
     return dt
 
 
 def toDatetime(night):
     '''
-    Returns the night parsed into a datetime object
+    Parses a string representation of night into a datetime object
     
     Args:
         night: a single night given as YYYYMMDD in string representation
+    
+    Returns a datetime object
     '''
     n = datetime(int(night[:4]), int(night[4:6]), int(night[6:]))
     return n
@@ -196,7 +204,7 @@ def toDatetime(night):
 
 def numNightsFullZero(date):
     '''
-    Returns the number of nights since a specified night of the full moon,
+    Calculates the number of nights since a specified night of the full moon,
     full_zero (11/12/2019 6:34)
     
     Args:
@@ -209,7 +217,7 @@ def numNightsFullZero(date):
 
 def getWedge(phase, der, fig, ra, dec):
     '''
-    Given a phase of the moon, returns the bokeh rendered point to represent the phase on the skypath plot
+    Given a phase of the moon, creates a bokeh point to represent the moon on the skypath plot
     
     Args:
         phase: a proportion representing the phase of the moon 
