@@ -607,7 +607,7 @@ def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, m
     keep = exposures['PROGRAM'] != 'CALIB'
     exposures_nocalib = exposures[keep]
 
-    fig = bk.figure(plot_width=width, plot_height=height, title = 'title', x_axis_label = "Exposure Time", min_border_left=min_border_left, min_border_right=min_border_right)
+    fig = bk.figure(plot_width=width, plot_height=height, title = 'title', x_axis_label = "Exposure Time (Minutes)", min_border_left=min_border_left, min_border_right=min_border_right)
 
     def exptime_dgb(program, color):
         '''
@@ -622,7 +622,7 @@ def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, m
         if not any(w):
             return
         a = exposures_nocalib[w]
-        hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
+        hist, edges = np.histogram(np.array(a["EXPTIME"])/60, density=True, bins=50)
         fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
 
     exptime_dgb("DARK", "red")
@@ -694,9 +694,8 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
     exposures_nocalib = exposures[keep]
     exposures_nocalib = exposures_nocalib["PROGRAM", "TILEID", "EXPTIME"]
 
-    fig = bk.figure(plot_width=width, plot_height=height, title = 'title', x_axis_label = "Total Exposure Time", min_border_left=min_border_left, min_border_right=min_border_right)
+    fig = bk.figure(plot_width=width, plot_height=height, title = 'title', x_axis_label = "Total Exposure Time (Minutes)", min_border_left=min_border_left, min_border_right=min_border_right)
     fig.yaxis.major_label_text_font_size = '0pt'
-    fig.xaxis.major_label_orientation = np.pi/4
     fig.title.text_color = '#ffffff'
 
     def total_exptime_dgb(program, color):
@@ -709,11 +708,12 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
             color: Color of histogram
         '''
         thisprogram = (exposures_nocalib["PROGRAM"] == program)
+        if not any(thisprogram):
+            return
+
         a = exposures_nocalib["TILEID", "EXPTIME"][thisprogram].group_by("TILEID").groups.aggregate(np.sum)
-
-        hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
+        hist, edges = np.histogram(np.array(a["EXPTIME"])/60, density=True, bins=50)
         fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
-
 
     total_exptime_dgb("DARK", "red")
     total_exptime_dgb("GRAY", "blue")
