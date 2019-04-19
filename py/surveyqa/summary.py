@@ -19,6 +19,7 @@ from astropy.table import Table, join
 from datetime import datetime, tzinfo
 import astropy.units as u
 from collections import Counter, OrderedDict
+from pathlib import PurePath
 
 #- Avoid warnings from date & coord calculations in the future
 import warnings
@@ -546,7 +547,7 @@ def get_hist(exposures, attribute, color, width=250, height=250, min_border_left
     fig_0.toolbar_location = None
     fig_0.title.text_color = '#ffffff'
     fig_0.yaxis.major_label_text_font_size = '0pt'
-    
+
     if attribute == 'TRANSP':
         fig_0.xaxis.axis_label = 'Transparency'
 
@@ -589,7 +590,7 @@ def get_exposuresPerTile_hist(exposures, color, width=250, height=250, min_borde
     fig_3.toolbar_location = None
     fig_3.title.text_color = '#ffffff'
     fig_3.yaxis.major_label_text_font_size = '0pt'
-    
+
     return fig_3
 
 def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, min_border_right=50):
@@ -640,7 +641,7 @@ def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, m
     fig.legend.glyph_height = 15
     fig.legend.glyph_width = 15
     fig.title.text_color = '#ffffff'
-    
+
     return fig
 
 def get_moonplot(exposures, width=250, height=250, min_border_left=50, min_border_right=50):
@@ -750,24 +751,38 @@ def makeplots(exposures, tiles, outdir):
 
     #- Generate HTML header separately so that we can get the right bokeh
     #- version in there without mucking up the python string formatting
+    version=bokeh.__version__
+    path=(PurePath(os.path.dirname(os.path.abspath(__file__))) / "..").as_posix()
     header = """
     <!DOCTYPE html>
     <html lang="en-US">
 
     <link
-        href="https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.css"
+        href="https://cdn.pydata.org/bokeh/release/bokeh-""" + str(version) + """.min.css"
         rel="stylesheet" type="text/css"
     >
     <link
-        href="https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.css"
+        href="https://cdn.pydata.org/bokeh/release/bokeh-tables-""" + str(version) + """.min.css"
         rel="stylesheet" type="text/css"
     >
     <script
-        src="https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.js"
+        src="https://cdn.pydata.org/bokeh/release/bokeh-""" + str(version) + """.min.js"
     ></script>
-    <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.js"
+
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-""" + str(version) + """.min.js"
     ></script>
-    """.format(version=bokeh.__version__)
+
+    <script type="text/javascript">
+    if (typeof Bokeh == 'undefined')
+    {
+        document.write("<link href='""" + str(path) + "/offline_files/bokeh" + str(version) + """.css' rel='stylesheet' type='text/css'>");
+        document.write("<link href='""" + str(path) + "/offline_files/bokeh_tables" + str(version) + """.css' rel='stylesheet' type='text/css'>");
+        document.write("<script src='""" + str(path) + "/offline_files/bokeh" + str(version) + """.js' type='text/javascript'><\/script>");
+        document.write("<script src='""" + str(path) + "/offline_files/bokeh_tables" + str(version) + """.js' type='text/javascript'><\/script>");
+    }
+    </script>
+
+    """
 
     #- Now add the HTML body with template placeholders for plots
     template = header + """
