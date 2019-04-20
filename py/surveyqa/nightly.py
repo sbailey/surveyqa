@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function
 import sys, os
 import numpy as np
 import bokeh as bk
+from os import walk
 
 import jinja2
 from bokeh.embed import components
@@ -122,7 +123,7 @@ def hourangle_timeseries(width=600, height=200, min_border_left=50, min_border_r
     '''Placeholder for a hour angle vs. time plot'''
     p = bk.figure(plot_width=width, plot_height=height,
                   x_axis_label='Time',
-                  y_axis_label='Hour Angle', min_border_left=min_border_left, 
+                  y_axis_label='Hour Angle', min_border_left=min_border_left,
                   min_border_right=min_border_right)
     p.xaxis.axis_label_text_color='#ffffff'
     p.toolbar_location = None
@@ -130,9 +131,9 @@ def hourangle_timeseries(width=600, height=200, min_border_left=50, min_border_r
 
 def brightness_timeseries(width=600, height=200, min_border_left=50, min_border_right=50):
     '''Placeholder for a sky brightness timeseries plot'''
-    p = bk.figure(plot_width=width, plot_height=height, 
+    p = bk.figure(plot_width=width, plot_height=height,
                   x_axis_label='Time',
-                  y_axis_label='Sky Brightness', 
+                  y_axis_label='Sky Brightness',
                   min_border_left=min_border_left,
                   min_border_right=min_border_right)
     p.xaxis.axis_label_text_color='#ffffff'
@@ -173,24 +174,24 @@ def get_nightlytable(exposures):
 def get_moonloc(night):
     """
     Returns the location of the moon on the given NIGHT
-    
+
     Args:
         night : night = YEARMMDD of sunset
-    
+
     Returns a SkyCoord object
     """
-    #- Re-formats night into YYYY-MM-DD HH:MM:SS 
+    #- Re-formats night into YYYY-MM-DD HH:MM:SS
     iso_format = night[:4] + '-' + night[4:6] + '-' + night[6:] + ' 00:00:00'
     t_midnight = Time(iso_format, format='iso') + 24*u.hour
     #- Sets timezone
     t_local = t_midnight + (-7)*u.hour
-    
+
     #- Sets location
     kitt = coordinates.EarthLocation.of_site('Kitt Peak National Observatory')
-    
+
     #- Gets moon coordinates
     moon_loc = coordinates.get_moon(time=t_local, location=kitt)
-    
+
     return moon_loc
 
 
@@ -222,7 +223,7 @@ def get_skypathplot(exposures, tiles, width=600, height=300, min_border_left=50,
     night_name = exposures['NIGHT'][0]
     string_date = night_name[4:6] + "-" + night_name[6:] + "-" + night_name[:4]
 
-    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date, 
+    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date,
                     min_border_left=min_border_left, min_border_right=min_border_right)
     fig.yaxis.axis_label = 'Declination (degrees)'
     fig.xaxis.axis_label = 'Right Ascension (degrees)'
@@ -238,17 +239,17 @@ def get_skypathplot(exposures, tiles, width=600, height=300, min_border_left=50,
     #- Plots tiles observed on NIGHT
     obs = fig.scatter('RA', 'DEC', size=5, fill_alpha=0.7, legend='PROGRAM', source=src, color=mapper)
     fig.line(src.data['RA'], src.data['DEC'], color='navy', alpha=0.4)
-    
+
     #- Stars the first point observed on NIGHT
     first = tiles_and_exps[0]
     fig.asterisk(first['RA'], first['DEC'], size=10, line_width=1.5, fill_color=None, color='orange')
-    
+
     #- Adds moon location at midnight on NIGHT
     night = exposures['NIGHT'][0]
     moon_loc = get_moonloc(night)
     ra, dec = float(moon_loc.ra.to_string(decimal=True)), float(moon_loc.dec.to_string(decimal=True))
     fig.circle(ra, dec, size=10, color='gold')
-    
+
 
     #- Circles the first point observed on NIGHT
     first = tiles_and_exps[0]
@@ -290,7 +291,23 @@ def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, h
 
     return fig
 
-def makeplots(night, exposures, tiles, outdir):
+def find_adj_files(dir, night):
+    f = []
+    for (dirpath, dirnames, filenames) in walk(dir):
+        f.extend(filenames)
+        break
+    f.sort(reverse=True)
+    night_html = "night-{}.html".format(night)
+    next = None
+    for file_name in f[1:]:
+        if (night_html > file_name):
+            return [file_name, next]
+        if (night_html == file_name):
+            return [file_name, file_name]
+        next = file_name
+    return [None, file_name]
+
+def makeplots(night, exposures, tiles, outdir, is_subset):
     '''
     Generates summary plots for the DESI survey QA
 
@@ -304,7 +321,39 @@ def makeplots(night, exposures, tiles, outdir):
     '''
 
     #getting path for the previous and next night links, first and last night links, link back to summary page
-    [prev_str, next_str] = get_night_link(night, exposures)
+    if (is_subset):
+        [prev_str, next_str] = find_adj_files(outdir, night)
+        if (prev_str == next_str):
+            with open(os.path.join(outdir, prev_str)) as file:
+                text = file.read()
+            text.replace("\n", "")
+            next_str = (text[(text.find("<!--n0-->")+17) : (text.find("<!--n1-->")-1)])
+            prev_str = (text[(text.find("<!--p0-->")+17) : (text.find("<!--p1-->")-1)])
+        else:
+            night_html = "night-{}.html".format(night)
+            if prev_str:
+                with open(os.path.join(outdir, prev_str)) as file:
+                    text = file.read()
+                html = (text[0:(text.find("<!--n0-->")+17)] + night_html + text[(text.find("<!--n1-->")-1):])
+                outfile = os.path.join(outdir, prev_str)
+                with open(outfile, 'w') as fx:
+                    fx.write(html)
+                print('Rewrote {}'.format(outfile))
+            else:
+                prev_str = night_html
+
+            if next_str:
+                with open(os.path.join(outdir, next_str)) as file:
+                    text = file.read()
+                html = (text[0:(text.find("<!--p0-->")+17)] + night_html + text[(text.find("<!--p1-->")-1):])
+                outfile = os.path.join(outdir, next_str)
+                with open(outfile, 'w') as fx:
+                    fx.write(html)
+                print('Rewrote {}'.format(outfile))
+            else:
+                next_str = night_html
+    else:
+        [prev_str, next_str] = get_night_link(night, exposures)
     first_str = get_night_link(exposures['NIGHT'][0], exposures)[0]
     last_str = get_night_link(exposures['NIGHT'][-1], exposures)[1]
     summary_str = "summary.html"
@@ -386,7 +435,6 @@ def makeplots(night, exposures, tiles, outdir):
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.js"
     ></script>
     """.format(version=bokeh.__version__)
-
     #- Now add the HTML body with template placeholders for plots
 
     template = header + """
@@ -461,13 +509,13 @@ def makeplots(night, exposures, tiles, outdir):
         <ul>
           <li style="float:left"><a>DESI Survey QA Night {}</a></li>
           <li><a href={}>Last</a></li>
-          <li><a href={}>Next</a></li>
-          <li><a href={}>Previous</a></li>
+          <li><!--n0--><a href={}><!--n1-->Next</a></li>
+          <li><!--p0--><a href={}><!--p1-->Previous</a></li>
           <li><a href={}>First</a></li>
           <li><a href={}>Summary Page</a></li>
         </ul>
     """.format(night, last_str, next_str, prev_str, first_str, summary_str)
-    
+
     template += """
         <div class="flex-container">
                 <div class="column middle">

@@ -55,5 +55,7 @@ def makeplots(exposures, tiles, outdir, show_summary = "all", nights = None):
     elif show_summary!="no":
         raise ValueError('show_summary should be "all", "subset", or "no". The value of show_summary was: {}'.format(show_summary))
 
-    for night in sorted(set(exposures_sub['NIGHT'])):
-        surveyqa.nightly.makeplots(night, exposures_sub, tiles, outdir)
+    sorted_nights = sorted(set(exposures_sub['NIGHT']))
+
+    for night in sorted_nights:
+        surveyqa.nightly.makeplots(night, exposures_sub, tiles, outdir, nights != None)
