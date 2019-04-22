@@ -292,6 +292,18 @@ def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, h
     return fig
 
 def find_adj_files(dir, night):
+    '''
+    Find adjacent nights of a given night in a directory
+
+    Args:
+        dir : Path to directory that contains all the html files for the nights
+        night : String representing a single value in the NIGHT column of the EXPOSURES table
+
+    Returns a list of previous night filename and the next night filename.
+    If file already exists for the current night, both the previous night filename
+    and the next night filename should be the existing filename. If there is no
+    previous or next night file, then the filename is replaced with None.
+    '''
     f = []
     for (dirpath, dirnames, filenames) in walk(dir):
         f.extend(filenames)
@@ -321,14 +333,17 @@ def makeplots(night, exposures, tiles, outdir, is_subset):
     '''
 
     #getting path for the previous and next night links, first and last night links, link back to summary page
+
+    # if the set of exposures is a subset, then we should update the existing files in the directory
     if (is_subset):
         [prev_str, next_str] = find_adj_files(outdir, night)
+        # if the file already exists, then preserve the same next and prev links
         if (prev_str == next_str):
             with open(os.path.join(outdir, prev_str)) as file:
                 text = file.read()
-            text.replace("\n", "")
             next_str = (text[(text.find("<!--n0-->")+17) : (text.find("<!--n1-->")-1)])
             prev_str = (text[(text.find("<!--p0-->")+17) : (text.find("<!--p1-->")-1)])
+        # if the file does not exist, replace the adjacent nights' links to accommodate the new night
         else:
             night_html = "night-{}.html".format(night)
             if prev_str:
@@ -354,6 +369,7 @@ def makeplots(night, exposures, tiles, outdir, is_subset):
                 next_str = night_html
     else:
         [prev_str, next_str] = get_night_link(night, exposures)
+
     first_str = get_night_link(exposures['NIGHT'][0], exposures)[0]
     last_str = get_night_link(exposures['NIGHT'][-1], exposures)[1]
     summary_str = "summary.html"
