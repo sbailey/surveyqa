@@ -752,7 +752,7 @@ def makeplots(exposures, tiles, outdir):
     #- Generate HTML header separately so that we can get the right bokeh
     #- version in there without mucking up the python string formatting
     version=bokeh.__version__
-    path=(PurePath(os.path.dirname(os.path.abspath(__file__))) / "..").as_posix()
+    path=PurePath(outdir).as_posix()
     header = """
     <!DOCTYPE html>
     <html lang="en-US">
