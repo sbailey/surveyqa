@@ -752,7 +752,6 @@ def makeplots(exposures, tiles, outdir):
     #- Generate HTML header separately so that we can get the right bokeh
     #- version in there without mucking up the python string formatting
     version=bokeh.__version__
-    path=PurePath(outdir).as_posix()
     header = """
     <!DOCTYPE html>
     <html lang="en-US">
@@ -775,10 +774,10 @@ def makeplots(exposures, tiles, outdir):
     <script type="text/javascript">
     if (typeof Bokeh == 'undefined')
     {
-        document.write("<link href='""" + str(path) + "/offline_files/bokeh" + str(version) + """.css' rel='stylesheet' type='text/css'>");
-        document.write("<link href='""" + str(path) + "/offline_files/bokeh_tables" + str(version) + """.css' rel='stylesheet' type='text/css'>");
-        document.write("<script src='""" + str(path) + "/offline_files/bokeh" + str(version) + """.js' type='text/javascript'><\/script>");
-        document.write("<script src='""" + str(path) + "/offline_files/bokeh_tables" + str(version) + """.js' type='text/javascript'><\/script>");
+        document.write("<link href='offline_files/bokeh""" + str(version) + """.css' rel='stylesheet' type='text/css'>");
+        document.write("<link href='offline_files/bokeh_tables""" + str(version) + """.css' rel='stylesheet' type='text/css'>");
+        document.write("<script src='offline_files/bokeh""" + str(version) + """.js' type='text/javascript'><\/script>");
+        document.write("<script src='offline_files/bokeh_tables""" + str(version) + """.js' type='text/javascript'><\/script>");
     }
     </script>
 
