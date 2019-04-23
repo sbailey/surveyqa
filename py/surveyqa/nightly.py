@@ -474,21 +474,52 @@ def makeplots(night, exposures, tiles, outdir):
     li a:hover {
       background-color: #111;
     }
+    
+    li a.noHover{
+      pointer-events: none;
+    }
     </style>
     </head>
     """
-    template += """
-    <body>
-        <ul>
-          <li style="float:left"><a>DESI Survey QA Night {}</a></li>
-          <li><a href={}>Last</a></li>
-          <li><a href={}>Next</a></li>
-          <li><a href={}>Previous</a></li>
-          <li><a href={}>First</a></li>
-          <li><a href={}>Summary Page</a></li>
-        </ul>
-    """.format(night, last_str, next_str, prev_str, first_str, summary_str)
     
+    night_str = "night-{}.html".format(night)
+    if next_str == night_str:
+        template += """
+        <body>
+            <ul>
+              <li style="float:left"><a>DESI Survey QA Night {}</a></li>
+              <li><a href={}>Last</a></li>
+              <li><a class="noHover">Next</a></li>
+              <li><a href={}>Previous</a></li>
+              <li><a href={}>First</a></li>
+              <li><a href={}>Summary Page</a></li>
+            </ul>
+        """.format(night, last_str, next_str, prev_str, first_str, summary_str)
+    if prev_str == night_str:
+        template += """
+        <body>
+            <ul>
+              <li style="float:left"><a>DESI Survey QA Night {}</a></li>
+              <li><a href={}>Last</a></li>
+              <li><a href={}>Next</a></li>
+              <li><a class="noHover">Previous</a></li>
+              <li><a href={}>First</a></li>
+              <li><a href={}>Summary Page</a></li>
+            </ul>
+        """.format(night, last_str, next_str, prev_str, first_str, summary_str)
+    else:
+        template += """
+        <body>
+            <ul>
+              <li style="float:left"><a>DESI Survey QA Night {}</a></li>
+              <li><a href={}>Last</a></li>
+              <li><a href={}>Next</a></li>
+              <li><a href={}>Previous</a></li>
+              <li><a href={}>First</a></li>
+              <li><a href={}>Summary Page</a></li>
+            </ul>
+        """.format(night, last_str, next_str, prev_str, first_str, summary_str)
+
     template += """
         <div class="flex-container">
                 <div class="column middle">
