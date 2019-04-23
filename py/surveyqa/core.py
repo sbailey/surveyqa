@@ -8,6 +8,9 @@ import numpy as np
 import surveyqa.summary
 import surveyqa.nightly
 
+import multiprocessing as mp
+
+
 def makeplots(exposures, tiles, outdir):
     '''
     Generates summary plots for the DESI survey QA
@@ -39,5 +42,9 @@ def makeplots(exposures, tiles, outdir):
 
     surveyqa.summary.makeplots(exposures, tiles, outdir)
 
-    for night in sorted(set(exposures['NIGHT'])):
-        surveyqa.nightly.makeplots(night, exposures, tiles, outdir)
+    pool = mp.Pool(mp.cpu_count())
+    
+    pool.starmap(surveyqa.nightly.makeplots, [(night, exposures, tiles, outdir) for night in sorted(set(exposures['NIGHT']))])
+
+    pool.close()
+    pool.join()
