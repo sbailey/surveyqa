@@ -4,9 +4,62 @@ Core functions for DESI survey quality assurance (QA)
 
 import sys, os
 import numpy as np
+import re
+from os import walk
 
 import surveyqa.summary
 import surveyqa.nightly
+
+def generate_js(outdir, nights, subset):
+    '''
+    Generates linking.js, which helps in linking all the nightly htmls together
+
+    Args:
+        outdir : directory to write linking.js and to check for previous html files
+        nights : list of nights (strings) to link together
+        subset : if True : nights is a subset, and we need to include all existing html files in outdir
+                 if False : nights is not a subset, and we do not need to include existing html files in outdir
+
+    Writes outdir/linking.js
+    '''
+    f = []
+    f += nights
+    if subset:
+        f_existing = []
+        for (dirpath, dirnames, filenames) in walk(outdir):
+            f.extend(filenames)
+            break
+        regex = re.compile("night-[0-9]+.html")
+        f_existing = [filename for filename in f if regex.match(filename)]
+        f_existing = [i[6:14] for i in f_existing]
+        f += f_existing
+        f = list(dict.fromkeys(f))
+        f.sort()
+    file_js = dict()
+    file_js["first"] = "night-"+f[0]+".html"
+    file_js["last"] = "night-"+f[len(f)-1]+".html"
+
+    for i in np.arange(len(f)):
+        inner_dict = dict()
+        if (len(f) == 1):
+            inner_dict["prev"] = "night-"+f[i]+".html"
+            inner_dict["next"] = "night-"+f[i]+".html"
+        elif i == 0:
+            inner_dict["prev"] = "night-"+f[i]+".html"
+            inner_dict["next"] = "night-"+f[i+1]+".html"
+        elif i == len(f)-1:
+            inner_dict["prev"] = "night-"+f[i-1]+".html"
+            inner_dict["next"] = "night-"+f[i]+".html"
+        else:
+            inner_dict["prev"] = "night-"+f[i-1]+".html"
+            inner_dict["next"] = "night-"+f[i+1]+".html"
+        file_js["n"+f[i]] = inner_dict
+
+    outfile = os.path.join(outdir, 'linking.js')
+    with open(outfile, 'w') as fp:
+        fp.write("get_dict({})".format(str(file_js)))
+
+    print('Wrote {}'.format(outfile))
 
 def makeplots(exposures, tiles, outdir, show_summary = "all", nights = None):
     '''
@@ -55,5 +108,8 @@ def makeplots(exposures, tiles, outdir, show_summary = "all", nights = None):
     elif show_summary!="no":
         raise ValueError('show_summary should be "all", "subset", or "no". The value of show_summary was: {}'.format(show_summary))
 
-    for night in sorted(set(exposures_sub['NIGHT'])):
+    nights_sub = sorted(set(exposures_sub['NIGHT']))
+    generate_js(outdir, nights_sub, nights != None)
+
+    for night in nights_sub:
         surveyqa.nightly.makeplots(night, exposures_sub, tiles, outdir)
