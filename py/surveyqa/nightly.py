@@ -122,7 +122,7 @@ def hourangle_timeseries(width=600, height=200, min_border_left=50, min_border_r
     '''Placeholder for a hour angle vs. time plot'''
     p = bk.figure(plot_width=width, plot_height=height,
                   x_axis_label='Time',
-                  y_axis_label='Hour Angle', min_border_left=min_border_left, 
+                  y_axis_label='Hour Angle', min_border_left=min_border_left,
                   min_border_right=min_border_right)
     p.xaxis.axis_label_text_color='#ffffff'
     p.toolbar_location = None
@@ -130,9 +130,9 @@ def hourangle_timeseries(width=600, height=200, min_border_left=50, min_border_r
 
 def brightness_timeseries(width=600, height=200, min_border_left=50, min_border_right=50):
     '''Placeholder for a sky brightness timeseries plot'''
-    p = bk.figure(plot_width=width, plot_height=height, 
+    p = bk.figure(plot_width=width, plot_height=height,
                   x_axis_label='Time',
-                  y_axis_label='Sky Brightness', 
+                  y_axis_label='Sky Brightness',
                   min_border_left=min_border_left,
                   min_border_right=min_border_right)
     p.xaxis.axis_label_text_color='#ffffff'
@@ -173,24 +173,24 @@ def get_nightlytable(exposures):
 def get_moonloc(night):
     """
     Returns the location of the moon on the given NIGHT
-    
+
     Args:
         night : night = YEARMMDD of sunset
-    
+
     Returns a SkyCoord object
     """
-    #- Re-formats night into YYYY-MM-DD HH:MM:SS 
+    #- Re-formats night into YYYY-MM-DD HH:MM:SS
     iso_format = night[:4] + '-' + night[4:6] + '-' + night[6:] + ' 00:00:00'
     t_midnight = Time(iso_format, format='iso') + 24*u.hour
     #- Sets timezone
     t_local = t_midnight + (-7)*u.hour
-    
+
     #- Sets location
     kitt = coordinates.EarthLocation.of_site('Kitt Peak National Observatory')
-    
+
     #- Gets moon coordinates
     moon_loc = coordinates.get_moon(time=t_local, location=kitt)
-    
+
     return moon_loc
 
 
@@ -222,7 +222,7 @@ def get_skypathplot(exposures, tiles, width=600, height=300, min_border_left=50,
     night_name = exposures['NIGHT'][0]
     string_date = night_name[4:6] + "-" + night_name[6:] + "-" + night_name[:4]
 
-    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date, 
+    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date,
                     min_border_left=min_border_left, min_border_right=min_border_right)
     fig.yaxis.axis_label = 'Declination (degrees)'
     fig.xaxis.axis_label = 'Right Ascension (degrees)'
@@ -238,17 +238,17 @@ def get_skypathplot(exposures, tiles, width=600, height=300, min_border_left=50,
     #- Plots tiles observed on NIGHT
     obs = fig.scatter('RA', 'DEC', size=5, fill_alpha=0.7, legend='PROGRAM', source=src, color=mapper)
     fig.line(src.data['RA'], src.data['DEC'], color='navy', alpha=0.4)
-    
+
     #- Stars the first point observed on NIGHT
     first = tiles_and_exps[0]
     fig.asterisk(first['RA'], first['DEC'], size=10, line_width=1.5, fill_color=None, color='orange')
-    
+
     #- Adds moon location at midnight on NIGHT
     night = exposures['NIGHT'][0]
     moon_loc = get_moonloc(night)
     ra, dec = float(moon_loc.ra.to_string(decimal=True)), float(moon_loc.dec.to_string(decimal=True))
     fig.circle(ra, dec, size=10, color='gold')
-    
+
 
     #- Circles the first point observed on NIGHT
     first = tiles_and_exps[0]
@@ -304,9 +304,9 @@ def makeplots(night, exposures, tiles, outdir):
     '''
 
     #getting path for the previous and next night links, first and last night links, link back to summary page
-    [prev_str, next_str] = get_night_link(night, exposures)
-    first_str = get_night_link(exposures['NIGHT'][0], exposures)[0]
-    last_str = get_night_link(exposures['NIGHT'][-1], exposures)[1]
+    #[prev_str, next_str] = get_night_link(night, exposures)
+    #first_str = get_night_link(exposures['NIGHT'][0], exposures)[0]
+    #last_str = get_night_link(exposures['NIGHT'][-1], exposures)[1]
     summary_str = "summary.html"
 
     #- Separate calibration exposures
@@ -460,14 +460,27 @@ def makeplots(night, exposures, tiles, outdir):
     <body>
         <ul>
           <li style="float:left"><a>DESI Survey QA Night {}</a></li>
-          <li><a href={}>Last</a></li>
-          <li><a href={}>Next</a></li>
-          <li><a href={}>Previous</a></li>
-          <li><a href={}>First</a></li>
+          <li><a id="last">Last</a></li>
+          <li><a id="next">Next</a></li>
+          <li><a id="prev">Previous</a></li>
+          <li><a id="first">First</a></li>
           <li><a href={}>Summary Page</a></li>
         </ul>
-    """.format(night, last_str, next_str, prev_str, first_str, summary_str)
-    
+    """.format(night, summary_str)
+
+    template += """
+    <script>
+        function get_dict(dict) {
+            document.getElementById("last").href = dict.last;
+            document.getElementById("first").href = dict.first;
+            var next_prev = dict.n"""+night+"""
+            document.getElementById("next").href = next_prev.next;
+            document.getElementById("prev").href = next_prev.prev;
+        }
+    </script>
+    <script src="linking.js"></script>
+    """
+
     template += """
         <div class="flex-container">
                 <div class="column middle">
