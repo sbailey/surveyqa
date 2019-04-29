@@ -498,43 +498,51 @@ def makeplots(night, exposures, tiles, outdir):
 
     # Navigation links, with grayed out Previous link on first night,
     # and similarly for Next link on last night.
+    # Put links in dict to use for formatting since different cases need
+    # different combinations of links
     night_str = "night-{}.html".format(night)
+    navigation_links = dict(
+            night=night,
+            nextfile=next_str, prevfile=prev_str,
+            firstfile=first_str, lastfile=last_str,
+            summaryfile=summary_str
+            )
     if next_str == night_str:
         template += """
         <body>
             <ul>
-              <li style="float:left"><a>DESI Survey QA Night {}</a></li>
-              <li><a href={}>Last</a></li>
+              <li style="float:left"><a>DESI Survey QA Night {night}</a></li>
+              <li><a href={lastfile}>Last</a></li>
               <li><a class="noHover">Next</a></li>
-              <li><a href={}>Previous</a></li>
-              <li><a href={}>First</a></li>
-              <li><a href={}>Summary Page</a></li>
+              <li><a href={prevfile}>Previous</a></li>
+              <li><a href={firstfile}>First</a></li>
+              <li><a href={summaryfile}>Summary Page</a></li>
             </ul>
-        """.format(night, last_str, next_str, prev_str, first_str, summary_str)
-    if prev_str == night_str:
+        """.format(**navigation_links)
+    elif prev_str == night_str:
         template += """
         <body>
             <ul>
-              <li style="float:left"><a>DESI Survey QA Night {}</a></li>
-              <li><a href={}>Last</a></li>
-              <li><a href={}>Next</a></li>
+              <li style="float:left"><a>DESI Survey QA Night {night}</a></li>
+              <li><a href={lastfile}>Last</a></li>
+              <li><a href={nextfile}>Next</a></li>
               <li><a class="noHover">Previous</a></li>
-              <li><a href={}>First</a></li>
-              <li><a href={}>Summary Page</a></li>
+              <li><a href={firstfile}>First</a></li>
+              <li><a href={summaryfile}>Summary Page</a></li>
             </ul>
-        """.format(night, last_str, next_str, prev_str, first_str, summary_str)
+        """.format(**navigation_links)
     else:
         template += """
         <body>
             <ul>
-              <li style="float:left"><a>DESI Survey QA Night {}</a></li>
-              <li><a href={}>Last</a></li>
-              <li><a href={}>Next</a></li>
-              <li><a href={}>Previous</a></li>
-              <li><a href={}>First</a></li>
-              <li><a href={}>Summary Page</a></li>
+              <li style="float:left"><a>DESI Survey QA Night {night}</a></li>
+              <li><a href={lastfile}>Last</a></li>
+              <li><a href={nextfile}>Next</a></li>
+              <li><a href={prevfile}>Previous</a></li>
+              <li><a href={firstfile}>First</a></li>
+              <li><a href={summaryfile}>Summary Page</a></li>
             </ul>
-        """.format(night, last_str, next_str, prev_str, first_str, summary_str)
+        """.format(**navigation_links)
 
     #- Now add the HTML body with template placeholders for plots
     template += """
