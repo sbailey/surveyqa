@@ -28,6 +28,7 @@ from bokeh.transform import factor_cmap
 from bokeh.models.widgets.tables import DataTable, TableColumn
 from astropy import coordinates
 from bokeh.models.widgets import NumberFormatter
+from pathlib import PurePath
 
 #- Avoid warnings from date & coord calculations in the future
 import warnings
@@ -111,7 +112,7 @@ def plot_timeseries(source, name, color, tools=None, x_range=None, title=None, t
     fig.xgrid.grid_line_color = None
     fig.outline_line_color = None
     fig.yaxis.axis_label = name.title()
-    
+
     if name == 'TRANSP':
         fig.yaxis.axis_label = 'Transparency'
     if name == 'HOURANGLE':
@@ -145,7 +146,7 @@ def get_nightlytable(exposures):
         seeing = np.array(exposures['SEEING']),
         transp = np.array(exposures['TRANSP']),
         sky = np.array(exposures['SKY']),
-        hourangle = np.array(exposures['HOURANGLE']),  
+        hourangle = np.array(exposures['HOURANGLE']),
     ))
 
     formatter = NumberFormatter(format='0,0.00')
@@ -170,24 +171,24 @@ def get_nightlytable(exposures):
 def get_moonloc(night):
     """
     Returns the location of the moon on the given NIGHT
-    
+
     Args:
         night : night = YEARMMDD of sunset
-    
+
     Returns a SkyCoord object
     """
-    #- Re-formats night into YYYY-MM-DD HH:MM:SS 
+    #- Re-formats night into YYYY-MM-DD HH:MM:SS
     iso_format = night[:4] + '-' + night[4:6] + '-' + night[6:] + ' 00:00:00'
     t_midnight = Time(iso_format, format='iso') + 24*u.hour
     #- Sets timezone
     t_local = t_midnight + (-7)*u.hour
-    
+
     #- Sets location
     kitt = coordinates.EarthLocation.of_site('Kitt Peak National Observatory')
-    
+
     #- Gets moon coordinates
     moon_loc = coordinates.get_moon(time=t_local, location=kitt)
-    
+
     return moon_loc
 
 
@@ -219,7 +220,7 @@ def get_skypathplot(exposures, tiles, width=600, height=300, min_border_left=50,
     night_name = exposures['NIGHT'][0]
     string_date = night_name[4:6] + "-" + night_name[6:] + "-" + night_name[:4]
 
-    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date, 
+    fig = bk.figure(width=width, height=height, title='Tiles observed on ' + string_date,
                     min_border_left=min_border_left, min_border_right=min_border_right)
     fig.yaxis.axis_label = 'Declination (degrees)'
     fig.xaxis.axis_label = 'Right Ascension (degrees)'
@@ -235,17 +236,17 @@ def get_skypathplot(exposures, tiles, width=600, height=300, min_border_left=50,
     #- Plots tiles observed on NIGHT
     obs = fig.scatter('RA', 'DEC', size=5, fill_alpha=0.7, legend='PROGRAM', source=src, color=mapper)
     fig.line(src.data['RA'], src.data['DEC'], color='navy', alpha=0.4)
-    
+
     #- Stars the first point observed on NIGHT
     first = tiles_and_exps[0]
     fig.asterisk(first['RA'], first['DEC'], size=10, line_width=1.5, fill_color=None, color='orange')
-    
+
     #- Adds moon location at midnight on NIGHT
     night = exposures['NIGHT'][0]
     moon_loc = get_moonloc(night)
     ra, dec = float(moon_loc.ra.to_string(decimal=True)), float(moon_loc.dec.to_string(decimal=True))
     fig.circle(ra, dec, size=10, color='gold')
-    
+
 
     #- Circles the first point observed on NIGHT
     first = tiles_and_exps[0]
@@ -283,16 +284,16 @@ def overlaid_hist(all_exposures, night_exposures, attribute, color, width=300, h
                     min_border_left=min_border_left, min_border_right=min_border_right)
     fig.quad(top=hist_all, bottom=0, left=edges_all[:-1], right=edges_all[1:], fill_color=color, alpha=0.2)
     fig.quad(top=hist_night, bottom=0, left=edges_night[:-1], right=edges_night[1:], fill_color=color, alpha=0.6)
-    
+
     if attribute == 'TRANSP':
         fig.xaxis.axis_label = 'Transparency'
     if attribute == 'HOURANGLE':
         fig.xaxis.axis_label = 'Hour Angle'
     if attribute == 'EXPTIME':
         fig.xaxis.axis_label = 'Exposure Time'
-    
+
     fig.yaxis.major_label_text_font_size = '0pt'
-    fig.yaxis.major_tick_line_color = None  
+    fig.yaxis.major_tick_line_color = None
     fig.yaxis.minor_tick_line_color = None
     fig.yaxis.axis_label_text_color = '#ffffff'
     fig.ygrid.grid_line_color = None
@@ -347,9 +348,9 @@ def makeplots(night, exposures, tiles, outdir):
     min_border_left_count = 70
     min_border_right_sky = 0
     min_border_left_sky = 60
-    
+
     time_hist_plot_height = 160
-    
+
     airmass = plot_timeseries(src, 'AIRMASS', 'green', tools=TOOLS, x_range=None, title=None, tooltips=TOOLTIPS, width=600, height=time_hist_plot_height, min_border_left=min_border_left_time, min_border_right=min_border_right_time)
     seeing = plot_timeseries(src, 'SEEING', 'navy', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=time_hist_plot_height, min_border_left=min_border_left_time, min_border_right=min_border_right_time)
     exptime = plot_timeseries(src, 'EXPTIME', 'darkorange', tools=TOOLS, x_range=airmass.x_range, tooltips=TOOLTIPS, width=600, height=time_hist_plot_height, min_border_left=min_border_left_time, min_border_right=min_border_right_time)
@@ -389,6 +390,7 @@ def makeplots(night, exposures, tiles, outdir):
 
     #- Generate HTML header separately so that we can get the right bokeh
     #- version in there without mucking up the python string formatting
+
     header = """
     <!DOCTYPE html>
     <html lang="en-US">
@@ -404,12 +406,24 @@ def makeplots(night, exposures, tiles, outdir):
     <script
         src="https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.js"
     ></script>
+
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.js"
     ></script>
+
+    <script type="text/javascript">
+    if (typeof Bokeh == 'undefined')
+    {{
+        document.write("<link href='offline_files/bokeh-{version}.css' rel='stylesheet' type='text/css'>");
+        document.write("<link href='offline_files/bokeh_tables-{version}.css' rel='stylesheet' type='text/css'>");
+        document.write("<script src='offline_files/bokeh-{version}.js' type='text/javascript'><\/script>");
+        document.write("<script src='offline_files/bokeh_tables-{version}.js' type='text/javascript'><\/script>");
+    }}
+    </script>
+
     """.format(version=bokeh.__version__)
 
-    #- Now add the HTML body with template placeholders for plots
 
+    #- CSS styling
     template = header + """
     <head>
     <style>
@@ -481,7 +495,9 @@ def makeplots(night, exposures, tiles, outdir):
     </style>
     </head>
     """
-    
+
+    # Navigation links, with grayed out Previous link on first night,
+    # and similarly for Next link on last night.
     night_str = "night-{}.html".format(night)
     if next_str == night_str:
         template += """
@@ -520,6 +536,7 @@ def makeplots(night, exposures, tiles, outdir):
             </ul>
         """.format(night, last_str, next_str, prev_str, first_str, summary_str)
 
+    #- Now add the HTML body with template placeholders for plots
     template += """
         <div class="flex-container">
                 <div class="column middle">
