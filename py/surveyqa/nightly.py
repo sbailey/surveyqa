@@ -35,6 +35,7 @@ import warnings
 warnings.filterwarnings('ignore', 'ERFA function.*dubious year.*')
 warnings.filterwarnings('ignore', 'Tried to get polar motions for times after IERS data is valid.*')
 
+utc_offset = -7*u.hour
 def find_night(exposures, night):
     """
     Generates a subtable of exposures corresponding to data from a single night N and adds column TIME
@@ -50,9 +51,8 @@ def find_night(exposures, night):
 
     #- Creates DateTime objects in Arizona timezone
     mjds = np.array(exposures['MJD'])
-    tzone = TimezoneInfo(utc_offset = -7*u.hour)
-    times = [Time(mjd, format='mjd', scale='utc').to_datetime(timezone=tzone) for mjd in mjds]
-
+    times = [(Time(mjd, format='mjd', scale='utc') + utc_offset).to_datetime() for mjd in mjds]
+    
     #- Adds times to table
     exposures['TIME'] = times
 

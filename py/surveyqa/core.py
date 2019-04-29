@@ -11,6 +11,8 @@ import surveyqa.summary
 import surveyqa.nightly
 from pathlib import PurePath
 
+import multiprocessing as mp
+
 def check_offline_files(dir):
     '''
     Checks if the Bokeh .js and .css files are present (so that the page works offline).
@@ -97,5 +99,9 @@ def makeplots(exposures, tiles, outdir, show_summary = "all", nights = None):
     elif show_summary!="no":
         raise ValueError('show_summary should be "all", "subset", or "no". The value of show_summary was: {}'.format(show_summary))
 
-    for night in sorted(set(exposures_sub['NIGHT'])):
-        surveyqa.nightly.makeplots(night, exposures_sub, tiles, outdir)
+    pool = mp.Pool(mp.cpu_count())
+    
+    pool.starmap(surveyqa.nightly.makeplots, [(night, exposures_sub, tiles, outdir) for night in sorted(set(exposures_sub['NIGHT']))])
+
+    pool.close()
+    pool.join()
