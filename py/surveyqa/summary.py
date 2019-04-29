@@ -751,39 +751,38 @@ def makeplots(exposures, tiles, outdir):
 
     #- Generate HTML header separately so that we can get the right bokeh
     #- version in there without mucking up the python string formatting
-    version=bokeh.__version__
     header = """
     <!DOCTYPE html>
     <html lang="en-US">
 
     <link
-        href="https://cdn.pydata.org/bokeh/release/bokeh-""" + str(version) + """.min.css"
+        href="https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.css"
         rel="stylesheet" type="text/css"
     >
     <link
-        href="https://cdn.pydata.org/bokeh/release/bokeh-tables-""" + str(version) + """.min.css"
+        href="https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.css"
         rel="stylesheet" type="text/css"
     >
     <script
-        src="https://cdn.pydata.org/bokeh/release/bokeh-""" + str(version) + """.min.js"
+        src="https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.js"
     ></script>
 
-    <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-""" + str(version) + """.min.js"
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.js"
     ></script>
 
     <script type="text/javascript">
     if (typeof Bokeh == 'undefined')
-    {
-        document.write("<link href='offline_files/bokeh""" + str(version) + """.css' rel='stylesheet' type='text/css'>");
-        document.write("<link href='offline_files/bokeh_tables""" + str(version) + """.css' rel='stylesheet' type='text/css'>");
-        document.write("<script src='offline_files/bokeh""" + str(version) + """.js' type='text/javascript'><\/script>");
-        document.write("<script src='offline_files/bokeh_tables""" + str(version) + """.js' type='text/javascript'><\/script>");
-    }
+    {{
+        document.write("<link href='offline_files/bokeh-{version}.css' rel='stylesheet' type='text/css'>");
+        document.write("<link href='offline_files/bokeh_tables-{version}.css' rel='stylesheet' type='text/css'>");
+        document.write("<script src='offline_files/bokeh-{version}.js' type='text/javascript'><\/script>");
+        document.write("<script src='offline_files/bokeh_tables-{version}.js' type='text/javascript'><\/script>");
+    }}
     </script>
 
-    """
+    """.format(version=bokeh.__version__)
 
-    #- Now add the HTML body with template placeholders for plots
+    #- CSS styling
     template = header + """
     <head>
     <style>
@@ -827,6 +826,7 @@ def makeplots(exposures, tiles, outdir):
     </head>
     """
 
+    #- Now add the HTML body with template placeholders for plots
     template += """
     <body>
         <div class="flex-container">

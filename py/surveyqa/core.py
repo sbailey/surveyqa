@@ -22,19 +22,17 @@ def check_offline_files(dir):
     '''
     path=(PurePath(dir) / "offline_files")
     version = bokeh.__version__
-    b_js = (path / 'bokeh{version}.js'.format(version=version)).as_posix()
-    bt_js = (path / 'bokeh_tables{version}.js'.format(version=version)).as_posix()
-    b_css = (path / 'bokeh{version}.css'.format(version=version)).as_posix()
-    bt_css = (path / 'bokeh_tables{version}.css'.format(version=version)).as_posix()
-    try:
-        fh = open(b_js, 'r')
-        fh = open(bt_js, 'r')
-        fh = open(b_css, 'r')
-        fh = open(bt_js, 'r')
+    b_js = (path / 'bokeh-{version}.js'.format(version=version)).as_posix()
+    bt_js = (path / 'bokeh_tables-{version}.js'.format(version=version)).as_posix()
+    b_css = (path / 'bokeh-{version}.css'.format(version=version)).as_posix()
+    bt_css = (path / 'bokeh_tables-{version}.css'.format(version=version)).as_posix()
+
+    if os.path.isfile(b_js) and os.path.isfile(bt_js) and \
+       os.path.isfile(b_css) and os.path.isfile(bt_js):
         print("Offline Bokeh files found")
-    except FileNotFoundError:
+    else:
         shutil.rmtree(path, True)
-        os.mkdir(path)
+        os.makedirs(path, exist_ok=True)
 
         url_js = "https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.js".format(version=version)
         urllib.request.urlretrieve(url_js, b_js)
