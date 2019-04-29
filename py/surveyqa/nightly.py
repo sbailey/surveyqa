@@ -554,6 +554,7 @@ def get_exptype_counts(exposures, calibs, width=300, height=300, min_border_left
     src = ColumnDataSource({'types':types, 'counts':counts})
 
     p = bk.figure(width=width, height=height,
+                   x_range=(0, np.max(counts)*1.15),
                   y_range=FactorRange(*types), title='Exposure Type Counts',
                   toolbar_location=None, min_border_left=min_border_left, min_border_right=min_border_right)
     p.hbar(y='types', right='counts', left=0, height=0.5, line_color='white',
