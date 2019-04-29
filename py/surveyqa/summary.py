@@ -19,6 +19,7 @@ from astropy.table import Table, join
 from datetime import datetime, tzinfo, timedelta
 import astropy.units as u
 from collections import Counter, OrderedDict
+from pathlib import PurePath
 
 #- Avoid warnings from date & coord calculations in the future
 import warnings
@@ -544,7 +545,7 @@ def get_hist(exposures, attribute, color, width=250, height=250, min_border_left
     fig_0.toolbar_location = None
     fig_0.title.text_color = '#ffffff'
     fig_0.yaxis.major_label_text_font_size = '0pt'
-    
+
     if attribute == 'TRANSP':
         fig_0.xaxis.axis_label = 'Transparency'
 
@@ -587,7 +588,7 @@ def get_exposuresPerTile_hist(exposures, color, width=250, height=250, min_borde
     fig_3.toolbar_location = None
     fig_3.title.text_color = '#ffffff'
     fig_3.yaxis.major_label_text_font_size = '0pt'
-    
+
     return fig_3
 
 def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, min_border_right=50):
@@ -638,7 +639,7 @@ def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, m
     fig.legend.glyph_height = 15
     fig.legend.glyph_width = 15
     fig.title.text_color = '#ffffff'
-    
+
     return fig
 
 def get_moonplot(exposures, width=250, height=250, min_border_left=50, min_border_right=50):
@@ -757,11 +758,23 @@ def makeplots(exposures, tiles, outdir):
     <script
         src="https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.js"
     ></script>
+
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.js"
     ></script>
+
+    <script type="text/javascript">
+    if (typeof Bokeh == 'undefined')
+    {{
+        document.write("<link href='offline_files/bokeh-{version}.css' rel='stylesheet' type='text/css'>");
+        document.write("<link href='offline_files/bokeh_tables-{version}.css' rel='stylesheet' type='text/css'>");
+        document.write("<script src='offline_files/bokeh-{version}.js' type='text/javascript'><\/script>");
+        document.write("<script src='offline_files/bokeh_tables-{version}.js' type='text/javascript'><\/script>");
+    }}
+    </script>
+
     """.format(version=bokeh.__version__)
 
-    #- Now add the HTML body with template placeholders for plots
+    #- CSS styling
     template = header + """
     <head>
     <style>
@@ -805,6 +818,7 @@ def makeplots(exposures, tiles, outdir):
     </head>
     """
 
+    #- Now add the HTML body with template placeholders for plots
     template += """
     <body>
         <div class="flex-container">
