@@ -2,13 +2,55 @@
 Core functions for DESI survey quality assurance (QA)
 """
 
-import sys, os
+import sys, os, shutil
 import numpy as np
 import re
 from os import walk
+import bokeh
+import urllib.request
 
 import surveyqa.summary
 import surveyqa.nightly
+from pathlib import PurePath
+
+import multiprocessing as mp
+
+def check_offline_files(dir):
+    '''
+    Checks if the Bokeh .js and .css files are present (so that the page works offline).
+    If they are not downloaded, they will be fetched and downloaded.
+
+    Args:
+        dir : directory of where the offline_files folder should be located.
+              If not present, an offline_files folder will be genreated.
+    '''
+    path=(PurePath(dir) / "offline_files")
+    version = bokeh.__version__
+    b_js = (path / 'bokeh-{version}.js'.format(version=version)).as_posix()
+    bt_js = (path / 'bokeh_tables-{version}.js'.format(version=version)).as_posix()
+    b_css = (path / 'bokeh-{version}.css'.format(version=version)).as_posix()
+    bt_css = (path / 'bokeh_tables-{version}.css'.format(version=version)).as_posix()
+
+    if os.path.isfile(b_js) and os.path.isfile(bt_js) and \
+       os.path.isfile(b_css) and os.path.isfile(bt_js):
+        print("Offline Bokeh files found")
+    else:
+        shutil.rmtree(path, True)
+        os.makedirs(path, exist_ok=True)
+
+        url_js = "https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.js".format(version=version)
+        urllib.request.urlretrieve(url_js, b_js)
+
+        url_tables_js = "https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.js".format(version=version)
+        urllib.request.urlretrieve(url_tables_js, bt_js)
+
+        url_css = "https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.css".format(version=version)
+        urllib.request.urlretrieve(url_css, b_css)
+
+        url_tables_css = "https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.css".format(version=version)
+        urllib.request.urlretrieve(url_tables_css, bt_css)
+
+        print("Downloaded offline Bokeh files")
 
 def generate_js(outdir, nights, subset):
     '''
@@ -79,6 +121,8 @@ def makeplots(exposures, tiles, outdir, show_summary = "all", nights = None):
     Writes outdir/summary.html and outdir/night-*.html
     '''
 
+    check_offline_files(outdir)
+
     D = exposures["MJD"] - 51544.5
     LST = (168.86072948111115 + 360.98564736628623 * D) % 360
     exposures["HOURANGLE"] = LST - exposures["RA"]
@@ -111,5 +155,9 @@ def makeplots(exposures, tiles, outdir, show_summary = "all", nights = None):
     nights_sub = sorted(set(exposures_sub['NIGHT']))
     generate_js(outdir, nights_sub, nights != None)
 
-    for night in nights_sub:
-        surveyqa.nightly.makeplots(night, exposures_sub, tiles, outdir)
+    pool = mp.Pool(mp.cpu_count())
+    
+    pool.starmap(surveyqa.nightly.makeplots, [(night, exposures_sub, tiles, outdir) for night in sorted(set(exposures_sub['NIGHT']))])
+
+    pool.close()
+    pool.join()

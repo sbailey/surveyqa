@@ -16,9 +16,10 @@ from bokeh.layouts import gridplot
 from bokeh.transform import transform
 from astropy.time import Time, TimezoneInfo
 from astropy.table import Table, join
-from datetime import datetime, tzinfo
+from datetime import datetime, tzinfo, timedelta
 import astropy.units as u
 from collections import Counter, OrderedDict
+from pathlib import PurePath
 
 #- Avoid warnings from date & coord calculations in the future
 import warnings
@@ -140,11 +141,10 @@ def get_median(attribute, exposures):
     Output:
         returns a numpy array of the median values for each night
     '''
-    night = exposures['NIGHT']
     medians = []
-    for n in list(OrderedDict(Counter(night)).keys()):
-        exp_night = exposures[exposures['NIGHT'] == n]
-        attrib = exp_night[attribute]
+    for n in np.unique(exposures['NIGHT']):
+        ii = (exposures['NIGHT'] == n)
+        attrib = np.asarray(exposures[attribute])[ii]
         medians.append(np.ma.median(attrib))  #- use masked median
 
     return np.array(medians)
@@ -158,29 +158,26 @@ def get_summarytable(exposures):
 
     Returns a bokeh DataTable object.
     '''
-    night = exposures['NIGHT']
-    sorted_total = OrderedDict(Counter(night))
-    night_exps_total = np.array(sorted_total.values())
+    nights = np.unique(exposures['NIGHT'])
 
-    #list of counts of each program for each night
-    dct = []
-    for n in list(sorted_total.keys()):
-        keep = exposures['NIGHT'] == n
-        nights_selected = exposures[keep]
-        program_freq = Counter(nights_selected['PROGRAM'])
-        dct.append(program_freq)
+    isbright = (exposures['PROGRAM'] == 'BRIGHT')
+    isgray = (exposures['PROGRAM'] == 'GRAY')
+    isdark = (exposures['PROGRAM'] == 'DARK')
+    iscalib = (exposures['PROGRAM'] == 'CALIB')
 
-    #get the values out of the dictionaries above (in a specified order so we can splice later)
-    counts = []
-    for d in dct:
-        for key in ['BRIGHT', 'GRAY', 'DARK', 'CALIB']:
-            counts.append(d[key])
-
-    #lists of counts of each program for each night
-    brights = np.array([counts[i] for i in np.arange(0,len(counts), 4)])
-    grays = np.array([counts[i] for i in np.arange(1,len(counts), 4)])
-    darks = np.array([counts[i] for i in np.arange(2,len(counts), 4)])
-    calibs = np.array([counts[i] for i in np.arange(3,len(counts), 4)])
+    num_nights = len(nights)
+    brights = list()
+    grays = list()
+    darks = list()
+    calibs = list()
+    totals = list()
+    for n in nights:
+        thisnight = exposures['NIGHT'] == n
+        totals.append(np.count_nonzero(thisnight))
+        brights.append(np.count_nonzero(thisnight & isbright))
+        grays.append(np.count_nonzero(thisnight & isgray))
+        darks.append(np.count_nonzero(thisnight & isdark))
+        calibs.append(np.count_nonzero(thisnight & iscalib))
 
     med_air = get_median('AIRMASS', exposures)
     med_seeing = get_median('SEEING', exposures)
@@ -189,8 +186,8 @@ def get_summarytable(exposures):
     med_sky = get_median('SKY', exposures)
 
     source = ColumnDataSource(data=dict(
-        nights = list(OrderedDict(Counter(exposures['NIGHT'])).keys()),
-        totals = list(OrderedDict(Counter(exposures['NIGHT'])).values()),
+        nights = list(nights),
+        totals = totals,
         brights = brights,
         grays = grays,
         darks = darks,
@@ -236,17 +233,60 @@ def nights_last_observed(exposures):
         return arr[len(arr)-1]
     return exposures.group_by("TILEID").groups.aggregate(last)
 
-tzone = TimezoneInfo(utc_offset = -7*u.hour)
+utc_offset = -7*u.hour
+tzone = TimezoneInfo(utc_offset = utc_offset)
 t1 = Time(58821, format='mjd', scale='utc')
 t = t1.to_datetime(timezone=tzone)
 
-def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, height=250, min_border_left=50, min_border_right=50):
+def get_progress(exposures, tiles, program):
+    '''Get survey and tile progress for a given program
+
+    Args:
+        exposures: Table with columns PROGRAM, TILEID, MJD
+        tiles: Table with columns TILEID, EXPOSEFAC
+        program: str program name to filter
+
+    Returns (time, survey_progress, tile_progress)
+
+    time = array of datetime objects;
+    survey_progress = array of EXPOSEFAC-weighted progress on observing tiles;
+    tile_progress = array of number of tiles observed
+    '''
+
+    keep = exposures['PROGRAM'] == program
+    exposures = exposures['TILEID', 'MJD'][keep]
+    keep = tiles['PROGRAM'] == program
+    tiles = tiles['TILEID', 'EXPOSEFAC'][keep]
+
+    #- Create table of last exposure for each tile, sorted by MJD
+    finished_tiles = exposures.group_by('TILEID').groups.aggregate(np.max)
+    finished_tiles = join(finished_tiles, tiles, keys='TILEID', join_type='left')
+    finished_tiles.sort('MJD')
+
+    #- Convert MJD to list of datetimes for bokeh
+    t1 = Time(finished_tiles['MJD'], format='mjd', scale='utc')
+    # t = t1.to_datetime(timezone=tzone)
+    # local non-timezone aware time, instead of much slower timezone aware
+    t = (t1 + utc_offset).to_datetime()
+
+    #- Tile progress is just counting tiles
+    tile_progress = np.arange(len(t))
+
+    #- Survey progress is weighted by EXPOSEFAC
+    survey_progress = np.cumsum(finished_tiles['EXPOSEFAC']) / np.sum(tiles['EXPOSEFAC'])
+
+    return t, tile_progress, survey_progress
+
+
+def get_surveyprogress_plot(progress, line_source, hover_follow, width=250, height=250, min_border_left=50, min_border_right=50):
     '''
     Generates a plot of survey progress (EXPOSEFAC) vs. time
 
+    TODO: update docs for what "progress" is
+
     Args:
-        exposures: Table of exposures with columns "PROGRAM", "TILEID", "MJD"
-        tiles: Table of tile locations with columns "TILEID", "EXPOSEFAC", "PROGRAM"
+        progress: dict keyed by DARK, GRAY, BRIGHT, with values
+            (time, survey_progress, tile_progress) from get_progress
         line_source: line_source for the horizontal gray cursor-tracking line
         hover_follow: HoverTool object for the horizontal gray cursor-tracking line
 
@@ -256,28 +296,6 @@ def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, h
 
     Returns bokeh Figure object
     '''
-    keep = exposures['PROGRAM'] != 'CALIB'
-    exposures_nocalib = exposures[keep]
-
-    tne = join(nights_last_observed(exposures_nocalib["TILEID", "MJD"]), tiles, keys="TILEID", join_type='inner')
-    tne.sort('MJD')
-
-    def bgd(string):
-        w = tne["PROGRAM"] == string
-        if not any(w):
-            return ([], [])
-        tne_d = tne[w]
-        x_d = np.array(tne_d['MJD'])
-        y_d1 = np.array(tne_d['EXPOSEFAC'])
-        s = 0
-        y_d = np.array([])
-        for i in y_d1:
-            s += i
-            y_d = np.append(y_d, s)
-        y_d = y_d/np.sum(tiles[tiles["PROGRAM"] == string]["EXPOSEFAC"])
-        t1 = Time(x_d, format='mjd', scale='utc')
-        t = t1.to_datetime(timezone=tzone)
-        return (t, y_d)
 
     hover = HoverTool(
             names=["D", "G", "B"],
@@ -287,11 +305,11 @@ def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, h
             ]
         )
 
-    fig1 = bk.figure(plot_width=width, plot_height=height, title = "Progress(ExposeFac Weighted) vs Time", x_axis_label = "Time", y_axis_label = "Fraction", x_axis_type="datetime", min_border_left=min_border_left, min_border_right=min_border_right)
+    fig1 = bk.figure(plot_width=width, plot_height=height, title = "Survey progress", x_axis_label = "Time", y_axis_label = "Fraction", x_axis_type="datetime", min_border_left=min_border_left, min_border_right=min_border_right)
     fig1.xaxis.axis_label_text_color = '#ffffff'
-    x_d, y_d = bgd("DARK")
-    x_g, y_g = bgd("GRAY")
-    x_b, y_b = bgd("BRIGHT")
+    x_d, tmp, y_d = progress["DARK"]
+    x_g, tmp, y_g = progress["GRAY"]
+    x_b, tmp, y_b = progress["BRIGHT"]
 
     source_d = ColumnDataSource(
             data=dict(
@@ -315,14 +333,13 @@ def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, h
             )
         )
 
-    startend = np.array([np.min(tne['MJD']), np.min(tne['MJD']) + 365.2422*5])
-    t1 = Time(startend, format='mjd', scale='utc')
-    t = t1.to_datetime(timezone=tzone)
+    tstart = min(x_d[0], x_g[0], x_b[0])
+    tend = tstart + timedelta(365.2422*5)
     source_line = ColumnDataSource(
             data=dict(
-                x=t,
+                x=[tstart, tend],
                 y=[0, 1],
-                date=[t1.strftime("%a, %d %b %Y %H:%M") for t1 in t],
+                date=[t1.strftime("%a, %d %b %Y %H:%M") for t1 in [tstart, tend]],
             )
         )
 
@@ -337,17 +354,21 @@ def get_surveyprogress(exposures, tiles, line_source, hover_follow, width=250, h
     fig1.legend.location = "top_left"
     fig1.legend.click_policy="hide"
     fig1.legend.spacing = 0
+    fig1.legend.label_text_font_size = '7pt'
+    fig1.legend.glyph_height = 10
+    fig1.legend.glyph_width = 10
 
     fig1.add_tools(hover)
     fig1.add_tools(hover_follow)
     return fig1
 
-def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=250, height=250, min_border_left=50, min_border_right=50):
+def get_tileprogress_plot(progress, tiles, line_source, hover_follow, width=250, height=250, min_border_left=50, min_border_right=50):
     '''
     Generates a plot of survey progress (total tiles) vs. time
 
     Args:
-        exposures: Table of exposures with columns "PROGRAM", "MJD", "TILEID"
+        progress: dict keyed by DARK, GRAY, BRIGHT, with values
+            (time, survey_progress, tile_progress) from get_progress
         tiles: Table of tile locations with columns "TILEID", "PROGRAM"
         line_source: line_source for the horizontal gray cursor-tracking line
         hover_follow: HoverTool object for the horizontal gray cursor-tracking line
@@ -358,29 +379,6 @@ def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=25
 
     Returns bokeh Figure object
     '''
-    keep = exposures['PROGRAM'] != 'CALIB'
-    exposures_nocalib = exposures[keep]
-    exposures_nocalib = nights_last_observed(exposures_nocalib["TILEID", "MJD", "PROGRAM"])
-    exposures_nocalib.sort('MJD')
-
-    tzone = TimezoneInfo(utc_offset = -7*u.hour)
-
-    def bgd(string):
-        w = exposures_nocalib["PROGRAM"] == string
-        if not any(w):
-            return ([], [])
-        tne_d = exposures_nocalib[w]
-        x_d = np.array(tne_d['MJD'])
-        s = 0
-        y_d = np.array([])
-        for i in x_d:
-            s += 1
-            y_d = np.append(y_d, s)
-        if x_d == []:
-            return ([], [])
-        t1 = Time(x_d, format='mjd', scale='utc')
-        t = t1.to_datetime(timezone=tzone)
-        return (t, y_d)
 
     hover = HoverTool(
             names=["G", "D", "B"],
@@ -393,9 +391,9 @@ def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=25
     fig = bk.figure(plot_width=width, plot_height=height, title = "# tiles vs time", x_axis_label = "Time",
                     y_axis_label = "# tiles", x_axis_type="datetime", min_border_left=min_border_left, min_border_right=min_border_right)
     fig.xaxis.axis_label_text_color = '#ffffff'
-    x_d, y_d = bgd("DARK")
-    x_g, y_g = bgd("GRAY")
-    x_b, y_b = bgd("BRIGHT")
+    x_d, y_d, tmp = progress["DARK"]
+    x_g, y_g, tmp = progress["GRAY"]
+    x_b, y_b, tmp = progress["BRIGHT"]
 
     source_d = ColumnDataSource(
             data=dict(
@@ -419,9 +417,9 @@ def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=25
             )
         )
 
-    startend = np.array([np.min(exposures_nocalib['MJD']), np.min(exposures_nocalib['MJD']) + 365.2422*5])
-    t1 = Time(startend, format='mjd', scale='utc')
-    t = t1.to_datetime(timezone=tzone)
+    tstart = min(x_d[0], x_g[0], x_b[0])
+    tend = tstart + timedelta(365.2422*5)
+    t = [tstart, tend]
     source_line_d = ColumnDataSource(
             data=dict(
                 x=t,
@@ -459,6 +457,9 @@ def get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=25
     fig.legend.location = "top_left"
     fig.legend.click_policy="hide"
     fig.legend.spacing = 0
+    fig.legend.label_text_font_size = '7pt'
+    fig.legend.glyph_height = 10
+    fig.legend.glyph_width = 10
 
     fig.add_tools(hover)
     fig.add_tools(hover_follow)
@@ -507,8 +508,12 @@ def get_linked_progress_plots(exposures, tiles, width=300, height=300, min_borde
                           point_policy='follow_mouse',
                           callback=CustomJS(code=js, args={'line_source': line_source}))
 
-    surveyprogress = get_surveyprogress(exposures, tiles, line_source, hover_follow, width=width, height=height, min_border_left=min_border_left, min_border_right=min_border_right)
-    tileprogress = get_surveyTileprogress(exposures, tiles, line_source, hover_follow, width=width, height=height, min_border_left=min_border_left, min_border_right=min_border_right)
+    progress = dict()
+    for program in ['DARK', 'GRAY', 'BRIGHT']:
+        progress[program] = get_progress(exposures, tiles, program)
+
+    surveyprogress = get_surveyprogress_plot(progress, line_source, hover_follow, width=width, height=height, min_border_left=min_border_left, min_border_right=min_border_right)
+    tileprogress = get_tileprogress_plot(progress, tiles, line_source, hover_follow, width=width, height=height, min_border_left=min_border_left, min_border_right=min_border_right)
     return gridplot([surveyprogress, tileprogress], ncols=2, plot_width=width, plot_height=height, toolbar_location='right')
 
 def get_hist(exposures, attribute, color, width=250, height=250, min_border_left=50, min_border_right=50):
@@ -539,6 +544,7 @@ def get_hist(exposures, attribute, color, width=250, height=250, min_border_left
     fig_0.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5)
     fig_0.toolbar_location = None
     fig_0.title.text_color = '#ffffff'
+    fig_0.yaxis.major_label_text_font_size = '0pt'
 
     if attribute == 'TRANSP':
         fig_0.xaxis.axis_label = 'Transparency'
@@ -581,6 +587,8 @@ def get_exposuresPerTile_hist(exposures, color, width=250, height=250, min_borde
     fig_3.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color="orange", alpha=0.5)
     fig_3.toolbar_location = None
     fig_3.title.text_color = '#ffffff'
+    fig_3.yaxis.major_label_text_font_size = '0pt'
+
     return fig_3
 
 def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, min_border_right=50):
@@ -600,8 +608,7 @@ def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, m
     keep = exposures['PROGRAM'] != 'CALIB'
     exposures_nocalib = exposures[keep]
 
-    fig = bk.figure(plot_width=width, plot_height=height, title = "Exposure Times",
-                    x_axis_label = "Exposure Time", min_border_left=min_border_left, min_border_right=min_border_right)
+    fig = bk.figure(plot_width=width, plot_height=height, title = 'title', x_axis_label = "Exposure Time (Minutes)", min_border_left=min_border_left, min_border_right=min_border_right)
 
     def exptime_dgb(program, color):
         '''
@@ -616,7 +623,7 @@ def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, m
         if not any(w):
             return
         a = exposures_nocalib[w]
-        hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
+        hist, edges = np.histogram(np.array(a["EXPTIME"])/60, density=True, bins=50)
         fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
 
     exptime_dgb("DARK", "red")
@@ -627,6 +634,11 @@ def get_exposeTimes_hist(exposures, width=500, height=300, min_border_left=50, m
     fig.toolbar_location = None
     fig.yaxis[0].formatter = NumeralTickFormatter(format="0.000")
     fig.yaxis.major_label_orientation = np.pi/4
+    fig.yaxis.major_label_text_font_size = '0pt'
+    fig.legend.label_text_font_size = '8.5pt'
+    fig.legend.glyph_height = 15
+    fig.legend.glyph_width = 15
+    fig.title.text_color = '#ffffff'
 
     return fig
 
@@ -683,13 +695,9 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
     exposures_nocalib = exposures[keep]
     exposures_nocalib = exposures_nocalib["PROGRAM", "TILEID", "EXPTIME"]
 
-    fig = bk.figure(plot_width=width, plot_height=height, title = "Total Exposure Time Per Tile Histogram",
-                    x_axis_label = "Total Exposure Time", min_border_left=min_border_left, min_border_right=min_border_right)
-
-    def sum_or_first(i):
-        if type(i[0]) is str:
-            return i[0]
-        return np.sum(i)
+    fig = bk.figure(plot_width=width, plot_height=height, title = 'title', x_axis_label = "Total Exposure Time (Minutes)", min_border_left=min_border_left, min_border_right=min_border_right)
+    fig.yaxis.major_label_text_font_size = '0pt'
+    fig.title.text_color = '#ffffff'
 
     def total_exptime_dgb(program, color):
         '''
@@ -700,14 +708,13 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
             program: String of the desired program name
             color: Color of histogram
         '''
-        a = exposures_nocalib.group_by("TILEID").groups.aggregate(sum_or_first)
-        w = a["PROGRAM"] == program
-        if not any(w):
+        thisprogram = (exposures_nocalib["PROGRAM"] == program)
+        if not any(thisprogram):
             return
-        a = a[w]
-        hist, edges = np.histogram(a["EXPTIME"], density=True, bins=50)
-        fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
 
+        a = exposures_nocalib["TILEID", "EXPTIME"][thisprogram].group_by("TILEID").groups.aggregate(np.sum)
+        hist, edges = np.histogram(np.array(a["EXPTIME"])/60, density=True, bins=50)
+        fig.quad(top=hist, bottom=0, left=edges[:-1], right=edges[1:], fill_color=color, alpha=0.5, legend = program)
 
     total_exptime_dgb("DARK", "red")
     total_exptime_dgb("GRAY", "blue")
@@ -716,6 +723,9 @@ def get_expTimePerTile(exposures, width=250, height=250, min_border_left=50, min
     fig.legend.click_policy="hide"
     fig.yaxis[0].formatter = NumeralTickFormatter(format="0.000")
     fig.yaxis.major_label_orientation = np.pi/4
+    fig.legend.label_text_font_size = '8.5pt'
+    fig.legend.glyph_height = 15
+    fig.legend.glyph_width = 15
 
     return fig
 
@@ -748,11 +758,23 @@ def makeplots(exposures, tiles, outdir):
     <script
         src="https://cdn.pydata.org/bokeh/release/bokeh-{version}.min.js"
     ></script>
+
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.js"
     ></script>
+
+    <script type="text/javascript">
+    if (typeof Bokeh == 'undefined')
+    {{
+        document.write("<link href='offline_files/bokeh-{version}.css' rel='stylesheet' type='text/css'>");
+        document.write("<link href='offline_files/bokeh_tables-{version}.css' rel='stylesheet' type='text/css'>");
+        document.write("<script src='offline_files/bokeh-{version}.js' type='text/javascript'><\/script>");
+        document.write("<script src='offline_files/bokeh_tables-{version}.js' type='text/javascript'><\/script>");
+    }}
+    </script>
+
     """.format(version=bokeh.__version__)
 
-    #- Now add the HTML body with template placeholders for plots
+    #- CSS styling
     template = header + """
     <head>
     <style>
@@ -796,6 +818,7 @@ def makeplots(exposures, tiles, outdir):
     </head>
     """
 
+    #- Now add the HTML body with template placeholders for plots
     template += """
     <body>
         <div class="flex-container">
@@ -823,9 +846,9 @@ def makeplots(exposures, tiles, outdir):
                     <div>{{ exposePerTile_hist_script }} {{ exposePerTile_hist_div }}</div>
                     <div>{{ brightness_script }} {{ brightness_div }}</div>
                     <div>{{ hourangle_script }} {{ hourangle_div }}</div>
-                    <div>{{ moonplot_script }} {{ moonplot_div }}</div>
                     <div>{{ exptime_script }} {{ exptime_div }}</div>
-                    <div>{{ expTimePerTile_script}} {{ expTimePerTile_div }}</div>
+                    <div>{{ expTimePerTile_script }} {{ expTimePerTile_div }}</div>
+                    <div>{{ moonplot_script }} {{ moonplot_div }}</div>
                 </div>
 
                 <div class="header">
@@ -846,10 +869,10 @@ def makeplots(exposures, tiles, outdir):
 
     min_border = 30
 
-    skyplot = get_skyplot(exposures, tiles, 500, 300, min_border_left=min_border, min_border_right=min_border)
+    skyplot = get_skyplot(exposures, tiles, 500, 250, min_border_left=min_border, min_border_right=min_border)
     skyplot_script, skyplot_div = components(skyplot)
 
-    progressplot = get_linked_progress_plots(exposures, tiles, 375, 300, min_border_left=min_border, min_border_right=min_border)
+    progressplot = get_linked_progress_plots(exposures, tiles, 250, 250, min_border_left=min_border, min_border_right=min_border)
     progress_script, progress_div = components(progressplot)
 
     summarytable = get_summarytable(exposures)
@@ -867,7 +890,7 @@ def makeplots(exposures, tiles, outdir):
     exposePerTile_hist = get_exposuresPerTile_hist(exposures, "orange", 250, 250, min_border_left=min_border, min_border_right=min_border)
     exposePerTile_hist_script, exposePerTile_hist_div = components(exposePerTile_hist)
 
-    exptime_hist = get_exposeTimes_hist(exposures, 500, 250, min_border_left=min_border, min_border_right=min_border)
+    exptime_hist = get_exposeTimes_hist(exposures, 250, 250, min_border_left=min_border, min_border_right=min_border)
     exptime_script, exptime_div = components(exptime_hist)
 
     moonplot = get_moonplot(exposures, 500, 250, min_border_left=min_border, min_border_right=min_border)
@@ -879,7 +902,7 @@ def makeplots(exposures, tiles, outdir):
     hourangleplot = get_hist(exposures, "HOURANGLE", "magenta", 250, 250, min_border_left=min_border, min_border_right=min_border)
     hourangle_script, hourangle_div = components(hourangleplot)
 
-    expTimePerTile_plot = get_expTimePerTile(exposures, 500, 250, min_border_left=min_border, min_border_right=min_border)
+    expTimePerTile_plot = get_expTimePerTile(exposures, 250, 250, min_border_left=min_border, min_border_right=min_border)
     expTimePerTile_script, expTimePerTile_div = components(expTimePerTile_plot)
 
     #- Convert to a jinja2.Template object and render HTML
@@ -892,10 +915,10 @@ def makeplots(exposures, tiles, outdir):
         exptime_script=exptime_script, exptime_div=exptime_div,
         transp_hist_script=transp_hist_script, transp_hist_div=transp_hist_div,
         exposePerTile_hist_script=exposePerTile_hist_script, exposePerTile_hist_div=exposePerTile_hist_div,
-        moonplot_script=moonplot_script, moonplot_div=moonplot_div,
         brightness_script=brightness_script, brightness_div=brightness_div,
         hourangle_script=hourangle_script, hourangle_div=hourangle_div,
         expTimePerTile_script=expTimePerTile_script, expTimePerTile_div=expTimePerTile_div,
+        moonplot_script=moonplot_script, moonplot_div=moonplot_div,
         )
 
     outfile = os.path.join(outdir, 'summary.html')
