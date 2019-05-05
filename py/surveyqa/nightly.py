@@ -52,7 +52,7 @@ def find_night(exposures, night):
     #- Creates DateTime objects in Arizona timezone
     mjds = np.array(exposures['MJD'])
     times = [(Time(mjd, format='mjd', scale='utc') + utc_offset).to_datetime() for mjd in mjds]
-    
+
     #- Adds times to table
     exposures['TIME'] = times
 
@@ -125,27 +125,6 @@ def plot_timeseries(source, name, color, tools=None, x_range=None, title=None, t
     fig.add_tools(hover)
 
     return fig
-
-def hourangle_timeseries(width=600, height=200, min_border_left=50, min_border_right=50):
-    '''Placeholder for a hour angle vs. time plot'''
-    p = bk.figure(plot_width=width, plot_height=height,
-                  x_axis_label='Time',
-                  y_axis_label='Hour Angle', min_border_left=min_border_left,
-                  min_border_right=min_border_right)
-    p.xaxis.axis_label_text_color='#ffffff'
-    p.toolbar_location = None
-    return p
-
-def brightness_timeseries(width=600, height=200, min_border_left=50, min_border_right=50):
-    '''Placeholder for a sky brightness timeseries plot'''
-    p = bk.figure(plot_width=width, plot_height=height,
-                  x_axis_label='Time',
-                  y_axis_label='Sky Brightness',
-                  min_border_left=min_border_left,
-                  min_border_right=min_border_right)
-    p.xaxis.axis_label_text_color='#ffffff'
-    p.toolbar_location = None
-    return p
 
 def get_nightlytable(exposures):
     '''
@@ -509,7 +488,7 @@ def makeplots(night, exposures, tiles, outdir):
     li a:hover {
       background-color: #111;
     }
-    
+
     li a.noHover{
       pointer-events: none;
     }
@@ -543,63 +522,49 @@ def makeplots(night, exposures, tiles, outdir):
     night_str = "night-{}.html".format(night)
     navigation_links = dict(
             night=night,
-            nextfile=next_str, prevfile=prev_str,
-            firstfile=first_str, lastfile=last_str,
             summaryfile=summary_str
             )
-    if next_str == night_str:
-        template += """
-        <body>
-            <ul>
-              <li style="float:left"><a>DESI Survey QA Night {night}</a></li>
-              <li><a href={lastfile}>Last</a></li>
-              <li><a class="noHover">Next</a></li>
-              <li><a href={prevfile}>Previous</a></li>
-              <li><a href={firstfile}>First</a></li>
-              <li><a href={summaryfile}>Summary Page</a></li>
-            </ul>
-        """.format(**navigation_links)
-    elif prev_str == night_str:
-        template += """
-        <body>
-            <ul>
-              <li style="float:left"><a>DESI Survey QA Night {night}</a></li>
-              <li><a href={lastfile}>Last</a></li>
-              <li><a href={nextfile}>Next</a></li>
-              <li><a class="noHover">Previous</a></li>
-              <li><a href={firstfile}>First</a></li>
-              <li><a href={summaryfile}>Summary Page</a></li>
-            </ul>
-        """.format(**navigation_links)
-    else:
-        template += """
-        <body>
-            <ul>
-              <li style="float:left"><a>DESI Survey QA Night {night}</a></li>
-              <li><a href={lastfile}>Last</a></li>
-              <li><a href={nextfile}>Next</a></li>
-              <li><a href={prevfile}>Previous</a></li>
-              <li><a href={firstfile}>First</a></li>
-              <li><a href={summaryfile}>Summary Page</a></li>
-            </ul>
-        """.format(**navigation_links)
+
+    template += """
+    <body>
+        <ul>
+          <li style="float:left"><a>DESI Survey QA Night {night}</a></li>
+          <li><a id="last">Last</a></li>
+          <li><a id="next">Next</a></li>
+          <li><a id="prev">Previous</a></li>
+          <li><a id="first">First</a></li>
+          <li><a href={summaryfile}>Summary Page</a></li>
+        </ul>
+    """.format(**navigation_links)
 
 # TODO: this is the code that updates the hrefs
-        
+
     #- Update the navigation hrefs using the cached valus in linking.js
     template += """
     <script>
-        function get_dict(dict) {
+        function get_linking_json_dict(dict) {
             document.getElementById("last").href = dict.last;
             document.getElementById("first").href = dict.first;
-            var next_prev = dict.n"""+night+"""
-            document.getElementById("next").href = next_prev.next;
-            document.getElementById("prev").href = next_prev.prev;
+            var next_prev = dict.n"""+night+""";
+
+            var next_item = next_prev.next;
+            if (next_item=="none") {
+                document.getElementById("next").className = "noHover";
+            } else {
+                document.getElementById("next").href = next_prev.next;
+            }
+
+            var prev_item = next_prev.prev;
+            if (prev_item=="none") {
+                document.getElementById("prev").className = "noHover";
+            } else {
+                document.getElementById("prev").href = next_prev.prev;
+            }
         }
     </script>
     <script src="linking.js"></script>
     """
-        
+
     #- Now add the HTML body with template placeholders for plots
     template += """
         <div class="flex-container">
@@ -635,7 +600,6 @@ def makeplots(night, exposures, tiles, outdir):
     outfile = os.path.join(outdir, 'night-{}.html'.format(night))
     with open(outfile, 'w') as fx:
         fx.write(html)
-
     print('Wrote {}'.format(outfile))
 
 def get_exptype_counts(exposures, calibs, width=300, height=300, min_border_left=50, min_border_right=50):
@@ -682,30 +646,3 @@ def get_exptype_counts(exposures, calibs, width=300, height=300, min_border_left
     p.xaxis.axis_label_text_color = '#ffffff'
 
     return p
-
-
-def get_night_link(night, exposures):
-    '''Gets the href string for the previous night and the next night for a given nightly page.
-        Input:
-            night: night value, string
-            exposures: Table with columns...
-        Output: [previous page href, next page href], elements are strings'''
-    unique_nights = list(np.unique(exposures['NIGHT']))
-    ind = unique_nights.index(night)
-
-    if ind == 0:
-        prev_night = night
-        next_night = unique_nights[ind+1]
-
-    if ind == (len(unique_nights)-1):
-        prev_night = unique_nights[ind-1]
-        next_night = night
-
-    if ind != 0 and ind != (len(unique_nights)-1):
-        prev_night = unique_nights[ind-1]
-        next_night = unique_nights[ind+1]
-
-    prev_str = "night-{}.html".format(prev_night)
-    next_str = "night-{}.html".format(next_night)
-
-    return [prev_str, next_str]

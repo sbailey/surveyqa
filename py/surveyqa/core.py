@@ -12,6 +12,7 @@ import urllib.request
 import surveyqa.summary
 import surveyqa.nightly
 from pathlib import PurePath
+import json
 
 import multiprocessing as mp
 
@@ -52,7 +53,7 @@ def check_offline_files(dir):
 
         print("Downloaded offline Bokeh files")
 
-def generate_js(outdir, nights, subset):
+def generate_js_containing_json_file(outdir, nights, subset):
     '''
     Generates linking.js, which helps in linking all the nightly htmls together
 
@@ -84,14 +85,14 @@ def generate_js(outdir, nights, subset):
     for i in np.arange(len(f)):
         inner_dict = dict()
         if (len(f) == 1):
-            inner_dict["prev"] = "night-"+f[i]+".html"
-            inner_dict["next"] = "night-"+f[i]+".html"
+            inner_dict["prev"] = "none"
+            inner_dict["next"] = "none"
         elif i == 0:
-            inner_dict["prev"] = "night-"+f[i]+".html"
+            inner_dict["prev"] = "none"
             inner_dict["next"] = "night-"+f[i+1]+".html"
         elif i == len(f)-1:
             inner_dict["prev"] = "night-"+f[i-1]+".html"
-            inner_dict["next"] = "night-"+f[i]+".html"
+            inner_dict["next"] = "none"
         else:
             inner_dict["prev"] = "night-"+f[i-1]+".html"
             inner_dict["next"] = "night-"+f[i+1]+".html"
@@ -99,7 +100,7 @@ def generate_js(outdir, nights, subset):
 
     outfile = os.path.join(outdir, 'linking.js')
     with open(outfile, 'w') as fp:
-        fp.write("get_dict({})".format(str(file_js)))
+        fp.write("get_linking_json_dict({})".format(json.dumps(file_js)))
 
     print('Wrote {}'.format(outfile))
 
@@ -153,10 +154,10 @@ def makeplots(exposures, tiles, outdir, show_summary = "all", nights = None):
         raise ValueError('show_summary should be "all", "subset", or "no". The value of show_summary was: {}'.format(show_summary))
 
     nights_sub = sorted(set(exposures_sub['NIGHT']))
-    generate_js(outdir, nights_sub, nights != None)
+    generate_js_containing_json_file(outdir, nights_sub, nights != None)
 
     pool = mp.Pool(mp.cpu_count())
-    
+
     pool.starmap(surveyqa.nightly.makeplots, [(night, exposures_sub, tiles, outdir) for night in sorted(set(exposures_sub['NIGHT']))])
 
     pool.close()
