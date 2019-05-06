@@ -53,7 +53,7 @@ def check_offline_files(dir):
 
         print("Downloaded offline Bokeh files")
 
-def generate_js_containing_json_file(outdir, nights, subset):
+def write_night_linkage(outdir, nights, subset):
     '''
     Generates linking.js, which helps in linking all the nightly htmls together
 
@@ -63,7 +63,9 @@ def generate_js_containing_json_file(outdir, nights, subset):
         subset : if True : nights is a subset, and we need to include all existing html files in outdir
                  if False : nights is not a subset, and we do not need to include existing html files in outdir
 
-    Writes outdir/linking.js
+    Writes outdir/linking.js, which defines a javascript function
+    `get_linking_json_dict` that returns a dictionary defining the first and
+    last nights, and the previous/next nights for each night.
     '''
     f = []
     f += nights
@@ -154,7 +156,7 @@ def makeplots(exposures, tiles, outdir, show_summary = "all", nights = None):
         raise ValueError('show_summary should be "all", "subset", or "no". The value of show_summary was: {}'.format(show_summary))
 
     nights_sub = sorted(set(exposures_sub['NIGHT']))
-    generate_js_containing_json_file(outdir, nights_sub, nights != None)
+    write_night_linkage(outdir, nights_sub, nights != None)
 
     pool = mp.Pool(mp.cpu_count())
 
