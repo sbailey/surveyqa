@@ -49,8 +49,8 @@ def make_calendar_html(nights_sub, outdir):
     """
 
     # Add each night into the dataSource, to let the calendar know that there
-    # is an event present on the night. The event tag is white to hide it, and just
-    # display the rengering above.
+    # is an event present on the night. The event tag is white in order to hide it,
+    # and to just display the rendering above.
     id = 0
     for night in nights_sub:
         html += """
