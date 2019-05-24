@@ -63,23 +63,39 @@ def check_offline_files(dir):
         urllib.request.urlretrieve(url_tables_css, bt_css)
 
         # Below are js/css libraries for viewing the calendar
-        url0 = "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
-        urllib.request.urlretrieve(url0, boot_css)
 
-        url1 = "https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"
-        urllib.request.urlretrieve(url1, jq_js)
+        cal_path=(PurePath(os.getcwd()) / ".." / "bootstrap-calendar")
+        source_boot_js = (cal_path / 'bootstrap.js').as_posix()
+        source_boot_css = (cal_path / 'bootstrap.css').as_posix()
+        source_byc_js = (cal_path / 'bootstrap-year-calendar.js').as_posix()
+        source_byc_css = (cal_path / 'bootstrap-year-calendar.css').as_posix()
+        source_jq_js = (cal_path / 'jquery_min.js').as_posix()
+        source_p_js = (cal_path / 'popper_min.js').as_posix()
 
-        url2 = "https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
-        urllib.request.urlretrieve(url2, p_js)
+        shutil.copyfile(source_boot_js, boot_css)
+        shutil.copyfile(source_boot_css, jq_js)
+        shutil.copyfile(source_byc_js, p_js)
+        shutil.copyfile(source_byc_css, boot_js)
+        shutil.copyfile(source_jq_js, byc_css)
+        shutil.copyfile(source_p_js, byc_js)
 
-        url3 = "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
-        urllib.request.urlretrieve(url3, boot_js)
-
-        url4 = "https://www.bootstrap-year-calendar.com/download/v1.1.0/bootstrap-year-calendar.min.css"
-        urllib.request.urlretrieve(url4, byc_css)
-
-        url5 = "https://www.bootstrap-year-calendar.com/download/v1.1.0/bootstrap-year-calendar.min.js"
-        urllib.request.urlretrieve(url5, byc_js)
+        # url0 = "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+        # urllib.request.urlretrieve(url0, boot_css)
+        #
+        # url1 = "https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"
+        # urllib.request.urlretrieve(url1, jq_js)
+        #
+        # url2 = "https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+        # urllib.request.urlretrieve(url2, p_js)
+        #
+        # url3 = "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+        # urllib.request.urlretrieve(url3, boot_js)
+        #
+        # url4 = "https://www.bootstrap-year-calendar.com/download/v1.1.0/bootstrap-year-calendar.min.css"
+        # urllib.request.urlretrieve(url4, byc_css)
+        #
+        # url5 = "https://www.bootstrap-year-calendar.com/download/v1.1.0/bootstrap-year-calendar.min.js"
+        # urllib.request.urlretrieve(url5, byc_js)
 
         print("Downloaded offline files")
 
