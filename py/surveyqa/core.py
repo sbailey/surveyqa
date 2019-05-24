@@ -11,6 +11,7 @@ import urllib.request
 
 import surveyqa.summary
 import surveyqa.nightly
+import surveyqa.calendar
 from pathlib import PurePath
 import json
 
@@ -32,9 +33,19 @@ def check_offline_files(dir):
     b_css = (path / 'bokeh-{version}.css'.format(version=version)).as_posix()
     bt_css = (path / 'bokeh_tables-{version}.css'.format(version=version)).as_posix()
 
+    boot_js = (path / 'bootstrap.js').as_posix()
+    boot_css = (path / 'bootstrap.css').as_posix()
+    byc_js = (path / 'bootstrap-year-calendar.js').as_posix()
+    byc_css = (path / 'bootstrap-year-calendar.css').as_posix()
+    jq_js = (path / 'jquery_min.js').as_posix()
+    p_js = (path / 'popper_min.js').as_posix()
+
     if os.path.isfile(b_js) and os.path.isfile(bt_js) and \
-       os.path.isfile(b_css) and os.path.isfile(bt_js):
-        print("Offline Bokeh files found")
+       os.path.isfile(b_css) and os.path.isfile(bt_js) and \
+       os.path.isfile(boot_js) and os.path.isfile(boot_css) and \
+       os.path.isfile(byc_js) and os.path.isfile(byc_css) and \
+       os.path.isfile(jq_js) and os.path.isfile(p_js):
+        print("Offline files found")
     else:
         shutil.rmtree(path, True)
         os.makedirs(path, exist_ok=True)
@@ -51,9 +62,28 @@ def check_offline_files(dir):
         url_tables_css = "https://cdn.pydata.org/bokeh/release/bokeh-tables-{version}.min.css".format(version=version)
         urllib.request.urlretrieve(url_tables_css, bt_css)
 
-        print("Downloaded offline Bokeh files")
+        # Below are js/css libraries for viewing the calendar
+        url0 = "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+        urllib.request.urlretrieve(url0, boot_css)
 
-def write_night_linkage(outdir, nights, subset):
+        url1 = "https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"
+        urllib.request.urlretrieve(url1, jq_js)
+
+        url2 = "https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+        urllib.request.urlretrieve(url2, p_js)
+
+        url3 = "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+        urllib.request.urlretrieve(url3, boot_js)
+
+        url4 = "https://www.bootstrap-year-calendar.com/download/v1.1.0/bootstrap-year-calendar.min.css"
+        urllib.request.urlretrieve(url4, byc_css)
+
+        url5 = "https://www.bootstrap-year-calendar.com/download/v1.1.0/bootstrap-year-calendar.min.js"
+        urllib.request.urlretrieve(url5, byc_js)
+
+        print("Downloaded offline files")
+
+def write_night_linkage_and_calendar(outdir, nights, subset):
     '''
     Generates linking.js, which helps in linking all the nightly htmls together
 
@@ -66,20 +96,27 @@ def write_night_linkage(outdir, nights, subset):
     Writes outdir/linking.js, which defines a javascript function
     `get_linking_json_dict` that returns a dictionary defining the first and
     last nights, and the previous/next nights for each night.
+
+    Also Writes outdir/calendar.html, which shows a yearly calendar view of the
+    nights which we have data for.
     '''
     f = []
     f += nights
     if subset:
         f_existing = []
         for (dirpath, dirnames, filenames) in walk(outdir):
-            f.extend(filenames)
+            f_existing.extend(filenames)
             break
         regex = re.compile("night-[0-9]+.html")
-        f_existing = [filename for filename in f if regex.match(filename)]
+        f_existing = [filename for filename in f_existing if regex.match(filename)]
         f_existing = [i[6:14] for i in f_existing]
         f += f_existing
         f = list(dict.fromkeys(f))
         f.sort()
+
+    # makes calendar.html given the list of nights
+    surveyqa.calendar.make_calendar_html(f, outdir)
+
     file_js = dict()
     file_js["first"] = "night-"+f[0]+".html"
     file_js["last"] = "night-"+f[len(f)-1]+".html"
@@ -156,7 +193,7 @@ def makeplots(exposures, tiles, outdir, show_summary = "all", nights = None):
         raise ValueError('show_summary should be "all", "subset", or "no". The value of show_summary was: {}'.format(show_summary))
 
     nights_sub = sorted(set(exposures_sub['NIGHT']))
-    write_night_linkage(outdir, nights_sub, nights != None)
+    write_night_linkage_and_calendar(outdir, nights_sub, nights != None)
 
     pool = mp.Pool(mp.cpu_count())
 
