@@ -784,7 +784,7 @@ def makeplots(exposures, tiles, outdir):
 
     .header {
         font-family: "Open Serif", Arial, Helvetica, sans-serif;
-        background-color: #f1f1f1;
+        background-color: #333;
         padding: 10px;
         text-align: left;
         justify: space-around;
